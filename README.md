@@ -138,7 +138,7 @@ credential names: `CLOUDFLARE_API_KEY` (an API token with Workers AI permission)
 Find the account id in the Cloudflare dashboard under Workers & Pages, "Account ID" on the right. It is not secret,
 but dsh builds the URL from it. Cloudflare says it does not train on or keep Workers AI content.
 
-**All four are off by default.** Add an entry from the settings page, or in the router row:
+**Groq, Cloudflare, ModelScope and NVIDIA are off by default.** The two Zhipu routes (`zhipu`, `zhipu-intl`) are the first two entries of the default chain. Add an optional entry from the settings page, or in the router row:
 
 ```yaml
 - id: llm-free-router
@@ -186,7 +186,7 @@ confirm "no billing attached"**, so on a first run set that yourself:
 
 | Field | Default | Meaning |
 | --- | --- | --- |
-| `chain` | Zhipu GLM-4.7-Flash, Gemini (2 models), OpenRouter `:free` (2 models), Mistral Small | Ordered `{ route, model, enabled }` entries. Only models in the presets (or `:free` ids on OpenRouter) are allowed. |
+| `chain` | Zhipu China `zhipu` GLM-4.7-Flash, Z.ai `zhipu-intl` GLM-4.7-Flash, Gemini (2 models), OpenRouter `:free` (2 models), Mistral Small | Ordered `{ route, model, enabled }` entries. Only models in the presets (or `:free` ids on OpenRouter) are allowed. |
 | `forbidBillableCalls` | `true` | Refuse anything that could be billed. |
 | `confirmedNoBilling` | `{}` | Per route, your statement that the account behind the key has no billing. Needed for `google`, `mistral`, `groq`, `cloudflare-workers-ai`. |
 | `allowBilling` | `{}` | Per route opt-in for providers that bill on their own. Needs `forbidBillableCalls: false`. No shipped preset needs it. |
@@ -335,7 +335,7 @@ dsh --profile <名称>
 和 `CLOUDFLARE_ACCOUNT_ID`。账号 ID 在 Cloudflare 控制台 Workers & Pages 页面右侧的 “Account ID”。它不是机密，但 dsh 用它拼接请求地址。
 Cloudflare 官方说明不会用 Workers AI 的内容训练模型，也不保留输入输出。
 
-**这四家默认都不启用。** 在设置页里手动添加，或在路由配置里写：
+**Groq、Cloudflare、ModelScope、NVIDIA 默认不启用**；智谱两条路由（`zhipu`、`zhipu-intl`）是默认链的前两位。可选项在设置页里手动添加，或在路由配置里写：
 
 ```yaml
 - id: llm-free-router
