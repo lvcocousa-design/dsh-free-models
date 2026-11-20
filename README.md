@@ -4,11 +4,11 @@ English | [中文](#中文说明)
 
 Free-tier model fallback for [DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness).
 It adds one virtual provider, `free-auto`. A request goes to the first available free-tier model in your
-chain (default: Gemini, then OpenRouter `:free` models, then Mistral). If that provider is out of
+chain (default: Zhipu GLM-4.7-Flash, then Gemini, then OpenRouter `:free` models, then Mistral). If that provider is out of
 quota, the request moves to the next one. A settings page shows the order, each provider's status and
 today's usage.
 
-This is an unofficial community plugin. It is not affiliated with DeepSeek, Google, OpenRouter, Mistral or Groq.
+This is an unofficial community plugin. It is not affiliated with DeepSeek, Zhipu, Google, OpenRouter, Mistral, Groq, Cloudflare, ModelScope or NVIDIA.
 
 ## Read this first: what it can and cannot guarantee
 
@@ -19,8 +19,8 @@ This is an unofficial community plugin. It is not affiliated with DeepSeek, Goog
   `:free` suffix on OpenRouter; it never sends Gemini models Google lists as not free (Gemini 4 Carbon,
   Argon, Neon, 3.1 Pro Preview); it stops using a provider at 80% of a published daily limit; it treats a
   429 as "exhausted" until the reset time; it stops using a route that answers 402 (payment request) until you press **Re-enable**; and a global
-  switch (**on by default**) refuses anything that could be billable. Each provider must be confirmed once as
-  "this account has no billing attached" before it is used.
+  switch (**on by default**) refuses anything that could be billable. Providers whose billing depends on the account
+  (Gemini, Mistral, Groq, Cloudflare) must be confirmed once as "this account has no billing attached" before they are used.
 - Free tiers change. Numbers in `packages/presets` carry a `verifiedAt` date and some are marked
   `unverified`. Run `pnpm check:models` before relying on them.
 - Free tiers on several providers may use your prompts to improve their products. Gemini's free tier says so
@@ -55,25 +55,88 @@ Select provider `free-auto`, model `auto`, in dsh.
 ## Get keys
 
 Use a fresh or billing-free account. Enter each key on dsh's **Models** page under that provider's route
-(`google`, `openrouter`, `mistral`). The page stores it through dsh's credential system.
+(`google`, `openrouter`, `mistral`). The page stores it through dsh's credential system. Zhipu and ModelScope need a one-time route declaration first, see [Zhipu, ModelScope, Cloudflare and NVIDIA](#zhipu-modelscope-cloudflare-and-nvidia).
 
 | Provider | Where | Notes |
 | --- | --- | --- |
 | Gemini | https://aistudio.google.com/apikey | Pick a Google Cloud project with no billing account linked. |
 | OpenRouter | https://openrouter.ai/settings/keys | Do not buy credits if you want a hard stop. Free models: 20 requests/min, 50/day (1000/day after a one-time $10 purchase, which this plugin does not assume). |
 | Mistral | https://console.mistral.ai/api-keys | Keep the workspace in Free mode. |
+| Zhipu (default chain, first) | https://open.bigmodel.cn/usercenter/apikeys/ | Free model: GLM-4.7-Flash only. Real-name verification may be asked for. Other Flash models are billed and are blocked by the plugin. |
 | Groq (optional, off by default) | https://console.groq.com/keys | Free plan only. Small token limits make it fit short tasks, not long agent runs. |
+| Cloudflare Workers AI (optional, off by default) | https://developers.cloudflare.com/fundamentals/api/get-started/create-token/ | Needs a Workers AI API token **and** your account id. Stay on the Free Workers plan. |
+| ModelScope (optional, off by default) | https://modelscope.cn/my/myaccesstoken | Non-commercial. The account must be linked to a real-name-verified Alibaba Cloud account. |
+| NVIDIA API catalog (optional, off by default) | https://build.nvidia.com/search | Trial terms only, and NVIDIA may use prompts to improve its products. |
 
 ## Limits at a glance
 
 | Provider | Free allowance used by the plugin | Resets | Overage |
 | --- | --- | --- | --- |
+| Zhipu GLM-4.7-Flash | Free model, limited by concurrency (requests in flight); the number is only in your console | n/a | Refuses (429); a free model has no billing path |
 | Gemini | Per model and per project; see AI Studio for your numbers (not hard-coded) | Pacific midnight | Refuses (429) with no billing; bills if billing is linked |
 | OpenRouter `:free` | 20/min, 50/day across all free models | UTC midnight | Refuses (429) |
 | Mistral | Free mode, lowest limits; no official numbers (not hard-coded) | Unknown, so the plugin backs off and retries | Refuses in Free mode |
 | Groq | 30 RPM, 1K RPD, 8K TPM, 200K TPD per model | UTC midnight | Refuses on Free plan |
+| Cloudflare Workers AI | 10,000 Neurons per day per account (about 100K tokens on these models, my estimate from the price list) | 00:00 UTC | Free plan: fails. Workers Paid plan: **billed** |
+| ModelScope | Metered in "Magic Beans" per call; the official page no longer states a daily number | Unknown | Refuses |
+| NVIDIA | about 40 requests per minute per account | n/a | No per-token billing; past the limit NVIDIA points to paid deployment |
+
+Sources and check date (2026-11-20): Zhipu https://open.bigmodel.cn/pricing , Cloudflare
+https://developers.cloudflare.com/workers-ai/platform/pricing/ , ModelScope
+https://www.modelscope.cn/docs/model-service/API-Inference/limits.md , NVIDIA https://build.nvidia.com/search .
 
 Excluded on purpose: Cerebras (a trial that needs a payment method) and GitHub Models (retired 2026-07-30).
+
+## Zhipu, ModelScope, Cloudflare and NVIDIA
+
+**Zhipu and ModelScope** are not routes that dsh ships, so declare each once in the pi-ai plugin row of your
+profile (merge with the providers you already have). The key goes under the credential name, never in the file:
+
+```yaml
+- name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      zhipu:
+        apiKeyEnv: ZHIPU_API_KEY
+        api: openai-completions
+        baseURL: https://open.bigmodel.cn/api/paas/v4/
+        models:
+          - { id: glm-4.7-flash, name: GLM-4.7-Flash, contextWindow: 200000 }
+      modelscope:   # optional
+        apiKeyEnv: MODELSCOPE_ACCESS_TOKEN
+        api: openai-completions
+        baseURL: https://api-inference.modelscope.cn/v1/
+        models:
+          - { id: Qwen/Qwen3.5-35B-A3B, name: Qwen3.5 35B A3B, contextWindow: 131072 }
+```
+
+Provide the key as an environment variable of that name (tested in the end-to-end test). Storing it through dsh's
+credential store under the same name should work the same way, but I have not run that path.
+If a route is not declared, the router skips it (it shows as stopped with "route is not set up in dsh") and uses the next entry.
+The plugin only calls models its presets list. For Zhipu that is `glm-4.7-flash`; `glm-5.3-flash`, `glm-5.3-flashx`
+and `glm-4.6v-flashx` are refused because they are billed.
+
+**Cloudflare** and **NVIDIA** are routes dsh already ships (`cloudflare-workers-ai`, `nvidia`). Cloudflare needs two
+credential names: `CLOUDFLARE_API_KEY` (an API token with Workers AI permission) and `CLOUDFLARE_ACCOUNT_ID`.
+Find the account id in the Cloudflare dashboard under Workers & Pages, "Account ID" on the right. It is not secret,
+but dsh builds the URL from it. Cloudflare says it does not train on or keep Workers AI content.
+
+**All four are off by default.** Add an entry from the settings page, or in the router row:
+
+```yaml
+- id: llm-free-router
+  config:
+    confirmedNoBilling: { cloudflare-workers-ai: true }   # Cloudflare only, if the account is on the Free plan
+    chain:
+      - { route: zhipu, model: glm-4.7-flash, enabled: true }
+      - { route: cloudflare-workers-ai, model: '@cf/zai-org/glm-4.7-flash', enabled: true }
+```
+
+Compliance notes: **NVIDIA** is trial use only (not production) and its terms let NVIDIA use your content to improve
+its products, so it is skipped when `sensitiveRequests` is on. **ModelScope** is free for non-commercial use, not for
+production. Model lists change; ModelScope retires old models. `pnpm check:models` checks ModelScope and NVIDIA when you set
+`MODELSCOPE_ACCESS_TOKEN` / `NVIDIA_API_KEY`; Zhipu and Cloudflare are not checked by the script. Whether the ModelScope and NVIDIA models
+accept tool calls is not stated on the official pages, so they are marked `unverified`.
 
 ## How switching works
 
@@ -106,9 +169,9 @@ confirm "no billing attached"**, so on a first run set that yourself:
 
 | Field | Default | Meaning |
 | --- | --- | --- |
-| `chain` | Gemini (2 models), OpenRouter `:free` (2 models), Mistral Small | Ordered `{ route, model, enabled }` entries. Only models in the presets (or `:free` ids on OpenRouter) are allowed. |
+| `chain` | Zhipu GLM-4.7-Flash, Gemini (2 models), OpenRouter `:free` (2 models), Mistral Small | Ordered `{ route, model, enabled }` entries. Only models in the presets (or `:free` ids on OpenRouter) are allowed. |
 | `forbidBillableCalls` | `true` | Refuse anything that could be billed. |
-| `confirmedNoBilling` | `{}` | Per route, your statement that the account behind the key has no billing. Needed for `google`, `mistral`, `groq`. |
+| `confirmedNoBilling` | `{}` | Per route, your statement that the account behind the key has no billing. Needed for `google`, `mistral`, `groq`, `cloudflare-workers-ai`. |
 | `allowBilling` | `{}` | Per route opt-in for providers that bill on their own. Needs `forbidBillableCalls: false`. No shipped preset needs it. |
 | `minContext` | `128000` | Skip models with a smaller context window. |
 | `sensitiveRequests` | `false` | Skip providers whose free tier may use prompts for training. Check which presets are flagged before turning it on, since it can leave no usable entry. |
@@ -155,7 +218,7 @@ License: MIT.
 
 给 [DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness) 用的免费额度模型回退插件。非官方社区项目。
 
-它提供一个虚拟提供商 `free-auto`：请求先发给链条里第一个可用的免费模型（默认 Gemini，其次 OpenRouter 的 `:free` 模型，再次 Mistral），
+它提供一个虚拟提供商 `free-auto`：请求先发给链条里第一个可用的免费模型（默认先智谱 GLM-4.7-Flash，其次 Gemini，再次 OpenRouter 的 `:free` 模型，最后 Mistral），
 某家额度用完就自动换下一家。设置页可以调整顺序、查看各家状态和今日用量。
 
 ### 先看这几条
@@ -164,7 +227,7 @@ License: MIT.
   这样到达上限时提供商只会返回 429，不会扣费。
 - 插件额外做了：只调用预设里标为免费的模型；OpenRouter 必须带 `:free` 后缀；Gemini 4 Carbon/Argon/Neon 和 3.1 Pro Preview 永远不会被调用；
   达到公布的每日额度 80% 就停用该提供商；429 视为已耗尽直到重置；收到 402 就停用该路由，直到你在设置页点“重新启用”；全局“禁止可能计费的调用”默认开启；
-  每个提供商首次启用前必须确认“该账号没有绑定付费方式”。
+  账单取决于账号的提供商（Gemini、Mistral、Groq、Cloudflare）首次启用前必须确认“该账号没有绑定付费方式”。
 - 免费政策经常变化。预设里有核对日期，部分数字标为“未核实”。使用前先运行 `pnpm check:models`。
 - 多家免费层可能把你的提示词用于改进产品（Gemini 官方明确如此，其余按保守处理）。不能外传的代码不要发。
 - 密钥保存在 dsh 的凭据库 `~/.dsh/.credentials.yaml`（仅所有者可读，但是**明文**），以你身份运行的进程（包括 agent 工具进程）都能读到。插件本身不保存密钥。
@@ -185,7 +248,7 @@ dsh plugin --profile <名称> add ./packages/client-ui     # 可选：设置页
 dsh --profile <名称>
 ```
 
-在 dsh 里选择提供商 `free-auto`，模型 `auto`。各家密钥在 dsh 的“模型”页面按路由（`google`、`openrouter`、`mistral`）填写。
+在 dsh 里选择提供商 `free-auto`，模型 `auto`。各家密钥在 dsh 的“模型”页面按路由（`google`、`openrouter`、`mistral`）填写。智谱和魔搭要先声明一次路由，见下面的“智谱、魔搭、Cloudflare、NVIDIA”。
 
 ### 申请密钥
 
@@ -194,9 +257,68 @@ dsh --profile <名称>
 | Gemini | https://aistudio.google.com/apikey | 选择没有关联结算账号的 Google Cloud 项目 |
 | OpenRouter | https://openrouter.ai/settings/keys | 想要硬性停止就不要充值。免费模型每分钟 20 次、每天 50 次 |
 | Mistral | https://console.mistral.ai/api-keys | 保持 Free 模式 |
+| 智谱（默认链第一位） | https://open.bigmodel.cn/usercenter/apikeys/ | 免费的只有 GLM-4.7-Flash。可能要求实名认证。其他 Flash 型号收费，插件会拒绝调用 |
 | Groq（可选，默认不启用） | https://console.groq.com/keys | 只用 Free 计划，token 限额小，适合短任务 |
+| Cloudflare Workers AI（可选，默认不启用） | https://developers.cloudflare.com/fundamentals/api/get-started/create-token/ | 需要有 Workers AI 权限的 API Token **和**账号 ID，保持 Free Workers 计划 |
+| 魔搭 ModelScope（可选，默认不启用） | https://modelscope.cn/my/myaccesstoken | 仅限非商业。账号要绑定已实名认证的阿里云账号 |
+| NVIDIA API 目录（可选，默认不启用） | https://build.nvidia.com/search | 仅限试用条款，NVIDIA 可能把提示词用于改进产品 |
 
 已刻意排除：Cerebras（试用需要绑卡）、GitHub Models（2026-07-30 已下线）。
+
+### 智谱、魔搭、Cloudflare、NVIDIA
+
+**限额概览（核对日期 2026-11-20，官方页面）：**
+
+| 提供商 | 免费额度 | 用尽后 |
+| --- | --- | --- |
+| 智谱 GLM-4.7-Flash | 免费模型，按并发数限制，数字只在控制台可见 | 返回 429，没有计费通道 |
+| Cloudflare | 每个账号每天 1 万 Neurons，UTC 0 点重置（按价目表我估算约 10 万 token，非官方数字） | 免费计划直接失败；**Workers Paid 计划会扣费** |
+| 魔搭 | 按“魔粒”计量，官方页面不再公布每日数字 | 拒绝调用 |
+| NVIDIA | 每个账号约每分钟 40 次 | 没有按 token 计费，超出后官方引导到付费部署 |
+
+**智谱和魔搭**不是 dsh 自带的路由，需要在 profile 里的 pi-ai 插件配置里声明一次（和已有的 providers 合并）。密钥只用凭据名，不写进文件：
+
+```yaml
+- name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      zhipu:
+        apiKeyEnv: ZHIPU_API_KEY
+        api: openai-completions
+        baseURL: https://open.bigmodel.cn/api/paas/v4/
+        models:
+          - { id: glm-4.7-flash, name: GLM-4.7-Flash, contextWindow: 200000 }
+      modelscope:   # 可选
+        apiKeyEnv: MODELSCOPE_ACCESS_TOKEN
+        api: openai-completions
+        baseURL: https://api-inference.modelscope.cn/v1/
+        models:
+          - { id: Qwen/Qwen3.5-35B-A3B, name: Qwen3.5 35B A3B, contextWindow: 131072 }
+```
+
+密钥用同名环境变量提供（端到端测试验证过这条路径）。通过 dsh 凭据库按同名保存应该同样有效，但我没有跑过。
+没声明的路由会被跳过（显示为已停用，原因里写“route is not set up in dsh”），自动用下一个条目。
+插件只调用预设里列出的模型。智谱只有 `glm-4.7-flash`；`glm-5.3-flash`、`glm-5.3-flashx`、`glm-4.6v-flashx` 因为收费被拒绝。
+
+**Cloudflare 和 NVIDIA** 是 dsh 已有的路由（`cloudflare-workers-ai`、`nvidia`）。Cloudflare 需要两个凭据名：`CLOUDFLARE_API_KEY`（有 Workers AI 权限的 API Token）
+和 `CLOUDFLARE_ACCOUNT_ID`。账号 ID 在 Cloudflare 控制台 Workers & Pages 页面右侧的 “Account ID”。它不是机密，但 dsh 用它拼接请求地址。
+Cloudflare 官方说明不会用 Workers AI 的内容训练模型，也不保留输入输出。
+
+**这四家默认都不启用。** 在设置页里手动添加，或在路由配置里写：
+
+```yaml
+- id: llm-free-router
+  config:
+    confirmedNoBilling: { cloudflare-workers-ai: true }   # 仅 Cloudflare，账号在 Free 计划时才确认
+    chain:
+      - { route: zhipu, model: glm-4.7-flash, enabled: true }
+      - { route: cloudflare-workers-ai, model: '@cf/zai-org/glm-4.7-flash', enabled: true }
+```
+
+合规提示：**NVIDIA** 仅限试用、不得用于生产，条款允许 NVIDIA 用你的内容改进产品，所以打开 `sensitiveRequests` 时会被跳过。
+**魔搭**仅限非商业使用，不能用于生产。魔搭会下架旧模型，模型清单会变。`pnpm check:models` 在设置了 `MODELSCOPE_ACCESS_TOKEN` / `NVIDIA_API_KEY` 时会检查这两家，
+智谱和 Cloudflare 脚本不检查。魔搭和 NVIDIA 的模型是否支持工具调用，官方页面没写，所以标为“未核实”。
+智谱可能要求实名认证（官方页面没写清）；官方没有找到关于是否用提示词训练的说明。
 
 ### 切换规则
 

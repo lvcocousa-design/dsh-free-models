@@ -21,6 +21,10 @@ export interface ProviderStatus {
   verifiedAt: string
   /** The credential reference the key is stored under. A name only, never a value. */
   apiKeyEnv: string
+  requirements?: string
+  extraCredentials?: { env: string; hint: string }[]
+  customRoute?: { api: string; baseURL: string }
+  offByDefault: boolean
   models: { id: string; name: string; contextWindow: number; unverified: boolean; status: ProviderStatus['status']; until?: number; requests: number }[]
 }
 
@@ -68,6 +72,10 @@ export function buildStatus(route: string, presets: Iterable<ProviderPreset>, tr
         docsUrl: preset.docsUrl,
         verifiedAt: preset.verifiedAt,
         apiKeyEnv: preset.apiKeyEnv,
+        ...preset.requirements === undefined ? {} : { requirements: preset.requirements },
+        ...preset.extraCredentials === undefined ? {} : { extraCredentials: preset.extraCredentials.map(c => ({ ...c })) },
+        ...preset.customRoute === undefined ? {} : { customRoute: { ...preset.customRoute } },
+        offByDefault: preset.offByDefault === true,
         models: models.map(({ model, state: ms }) => ({
           id: model.id, name: model.name, contextWindow: model.contextWindow, unverified: model.unverified === true,
           status: ms.status, ...ms.until === undefined ? {} : { until: ms.until }, requests: ms.usage.requests,

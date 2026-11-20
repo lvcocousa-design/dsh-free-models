@@ -120,4 +120,75 @@ describe('free-auto over the real pi-ai adapter', () => {
       expect(error?.providerRetryAfterMs).toBeGreaterThan(0)
     } finally { await ctx.fiber.dispose() }
   })
+
+  describe('zhipu as a hand-declared pi-ai route', () => {
+    async function buildZhipu(zhipuUrl: string | undefined, orUrl: string) {
+      vi.stubEnv('FM_OR_KEY', 'k1')
+      vi.stubEnv('FM_ZHIPU_KEY', 'k3')
+      const ctx = new Context()
+      await ctx.plugin(LlmRuntime)
+      await ctx.plugin(LlmPiAi, {
+        providers: {
+          openrouter: { apiKeyEnv: 'FM_OR_KEY', baseURL: orUrl },
+          ...zhipuUrl === undefined ? {} : {
+            zhipu: {
+              apiKeyEnv: 'FM_ZHIPU_KEY', api: 'openai-completions', baseURL: zhipuUrl,
+              models: [{ id: 'glm-4.7-flash', name: 'GLM-4.7-Flash', contextWindow: 200000 }],
+            },
+          },
+        },
+      })
+      const router = new FreeRouterAdapter({
+        stream: options => ctx.llm.stream(options),
+        settings: () => settings({
+          chain: [
+            { route: 'zhipu', model: 'glm-4.7-flash', enabled: true },
+            { route: 'openrouter', model: 'google/gemma-4-31b-it:free', enabled: true },
+          ],
+        }),
+        presets: presetMap(PRESETS),
+        tracker: new QuotaTracker(PRESETS.map(p => ({ route: p.route, resetPolicy: p.resetPolicy, limits: p.limits }))),
+      })
+      ctx.llm.registerAdapter([FREE_ROUTE], router)
+      const run = async (): Promise<StreamChunk[]> => {
+        const chunks: StreamChunk[] = []
+        for await (const chunk of ctx.llm.stream({
+          provider: FREE_ROUTE, model: 'auto',
+          messages: [createUserMessage({ content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' } } as never)],
+        })) chunks.push(chunk)
+        return chunks
+      }
+      return { ctx, run }
+    }
+
+    it('serves from zhipu first when it answers', async () => {
+      const zhipu = await provider(() => ({ status: 200, body: textStream('from zhipu'), sse: true }))
+      const or = await provider(() => ({ status: 200, body: textStream('from openrouter'), sse: true }))
+      const { ctx, run } = await buildZhipu(zhipu.url, or.url)
+      try {
+        expect(text(await run())).toBe('from zhipu')
+        expect(or.hits()).toBe(0)
+      } finally { await ctx.fiber.dispose() }
+    })
+
+    it('falls back when zhipu refuses over its concurrency limit (HTTP 429, Chinese message)', async () => {
+      const zhipu = await provider(() => ({ status: 429, body: JSON.stringify({ error: { code: '1302', message: '您的账户已达到速率限制，请您控制请求频率' } }) }))
+      const or = await provider(() => ({ status: 200, body: textStream('from openrouter'), sse: true }))
+      const { ctx, run } = await buildZhipu(zhipu.url, or.url)
+      try {
+        expect(text(await run())).toBe('from openrouter')
+        expect(zhipu.hits()).toBe(1)
+      } finally { await ctx.fiber.dispose() }
+    })
+
+    it('falls back, and stops asking, when the zhipu route was never declared in dsh', async () => {
+      const or = await provider(() => ({ status: 200, body: textStream('from openrouter'), sse: true }))
+      const { ctx, run } = await buildZhipu(undefined, or.url)
+      try {
+        expect(text(await run())).toBe('from openrouter')
+        expect(text(await run())).toBe('from openrouter')
+        expect(or.hits()).toBe(2)
+      } finally { await ctx.fiber.dispose() }
+    })
+  })
 })

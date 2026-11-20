@@ -54,6 +54,22 @@ describe('billing confirmation and re-enable', () => {
   })
 })
 
+describe('provider cards for the optional providers', () => {
+  const cf = {
+    ...report.providers[0]!, route: 'cloudflare-workers-ai', displayName: 'Cloudflare Workers AI', overage: 'depends-on-account-billing', trainsOnFreeTierData: false,
+    status: 'ok' as const, offByDefault: true, requirements: 'Needs a Free plan account.',
+    extraCredentials: [{ env: 'CLOUDFLARE_ACCOUNT_ID', hint: 'Dashboard, Account ID.' }],
+  }
+  const ms = { ...report.providers[0]!, route: 'modelscope', displayName: 'ModelScope', status: 'ok' as const, trainsOnFreeTierData: false, offByDefault: true, customRoute: { api: 'openai-completions', baseURL: 'https://api-inference.modelscope.cn/v1/' } }
+  it('shows the extra credential, the setup URL and the off-by-default note', () => {
+    const html = renderToStaticMarkup(<FreeModelsPage {...props({ useReport: select => select({ report: { ...report, providers: [cf, ms] }, failed: false }) })} />)
+    expect(html).toContain('CLOUDFLARE_ACCOUNT_ID')
+    expect(html).toContain('Needs a Free plan account.')
+    expect(html).toContain('https://api-inference.modelscope.cn/v1/')
+    expect(html).toContain('Not in the default chain')
+  })
+})
+
 describe('status source', () => {
   it('polls only while subscribed and keeps the last report on failure', async () => {
     let calls = 0

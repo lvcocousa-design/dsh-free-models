@@ -1,7 +1,7 @@
 import type { FailureClass, FailureFacts } from './types.ts'
 
-const DAILY_HINT = /\b(per[\s_-]+day|daily|requests?[\s_-]+per[\s_-]+day|rpd|tokens?[\s_-]+per[\s_-]+day|tpd|free[\s_-]+(?:models?[\s_-]+)?(?:per[\s_-]+day|daily)|resource[\s_-]*exhausted|quota)\b/i
-const BILLING_HINT = /\b(billing|payment|insufficient[\s_-]+(?:credits?|balance|funds)|add[\s_-]+credits?|out[\s_-]+of[\s_-]+credits?)\b/i
+const DAILY_HINT = /\b(per[\s_-]+day|daily|requests?[\s_-]+per[\s_-]+day|rpd|tokens?[\s_-]+per[\s_-]+day|tpd|free[\s_-]+(?:models?[\s_-]+)?(?:per[\s_-]+day|daily)|resource[\s_-]*exhausted|quota)\b|每日|当日|今日/i
+const BILLING_HINT = /\b(billing|payment|insufficient[\s_-]+(?:credits?|balance|funds)|add[\s_-]+credits?|out[\s_-]+of[\s_-]+credits?)\b|余额不足|欠费|请充值|资源包/i
 
 /**
  * Reduce a provider failure to the decision policy needs.
@@ -26,6 +26,8 @@ export function classifyFailure(facts: FailureFacts): FailureClass {
       ? 'quota-daily'
       : 'rate-minute'
   }
+  // The route is not declared in dsh at all (custom routes such as zhipu need a one-time setup).
+  if (code === 'NO_ADAPTER') return 'auth'
   if (code === 'AUTH' || code === 'INVALID_CREDENTIAL' || code === 'MISSING_CREDENTIAL'
     || code === 'ACCOUNT_SIGN_IN_REQUIRED' || code === 'ACCOUNT_TOKEN_INVALID'
     || status === 401 || status === 403) return 'auth'

@@ -131,7 +131,7 @@ export class QuotaTracker {
         break
       case 'auth':
         // Retried after an hour so a corrected key works without a restart; a bad key just fails again.
-        this.mark(state, 'disabled', now + this.authRetryMs, 'credential missing, invalid or not authorized')
+        this.mark(state, 'disabled', now + this.authRetryMs, 'credential missing or invalid, or the route is not set up in dsh')
         break
       default:
         break

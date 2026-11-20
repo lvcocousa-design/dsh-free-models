@@ -70,6 +70,14 @@ function ProviderCard(props: { p: ProviderStatus; confirmed: boolean; writable: 
       <div style={{ ...muted, marginTop: 4 }}>
         {t('keyRef')}: <code>{p.apiKeyEnv}</code> · <a href={p.keyUrl} target="_blank" rel="noreferrer">{t('getKey')}</a>
       </div>
+      {p.extraCredentials?.map(c => (
+        <div key={c.env} style={{ ...muted, marginTop: 4 }}>{t('alsoNeeded')}: <code>{c.env}</code> · {c.hint}</div>
+      ))}
+      {p.customRoute !== undefined ? (
+        <div style={{ ...muted, marginTop: 4 }}>{t('customRoute')}: <code>{p.customRoute.baseURL}</code></div>
+      ) : null}
+      {p.requirements !== undefined ? <div style={{ ...muted, marginTop: 4 }}>{t('requirements')}: {p.requirements}</div> : null}
+      {p.offByDefault === true ? <div style={{ ...muted, marginTop: 4 }}>{t('offByDefault')}</div> : null}
       {p.overage === 'depends-on-account-billing' ? (
         <Check checked={props.confirmed} disabled={!props.writable} onChange={props.onConfirm}>
           {t('confirmNoBilling')}{props.confirmed ? '' : ` (${t('confirmNeeded')})`}

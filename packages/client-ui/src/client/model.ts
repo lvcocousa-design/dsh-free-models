@@ -18,6 +18,7 @@ export interface ProviderStatus {
   limits: { requestsPerMinute?: number; requestsPerDay?: number; tokensPerMinute?: number; tokensPerDay?: number }
   overage: string; trainsOnFreeTierData: boolean; billingNotice: string; keyUrl: string; docsUrl: string; verifiedAt: string
   apiKeyEnv: string; models: ModelStatus[]
+  requirements?: string; extraCredentials?: { env: string; hint: string }[]; customRoute?: { api: string; baseURL: string }; offByDefault?: boolean
 }
 export interface StatusReport { route: string; generatedAt: number; providers: ProviderStatus[] }
 

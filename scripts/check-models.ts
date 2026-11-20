@@ -3,7 +3,10 @@
  *
  * - OpenRouter: the public /models list needs no key. Every preset model must still be listed with
  *   zero prompt and completion price. Exit code 1 if one is gone or no longer free.
- * - Gemini, Mistral: listed only when GEMINI_API_KEY / MISTRAL_API_KEY is set in the environment.
+ * - Gemini, Mistral, ModelScope, NVIDIA: listed only when GEMINI_API_KEY / MISTRAL_API_KEY / MODELSCOPE_ACCESS_TOKEN /
+ *   NVIDIA_API_KEY is set. (The ModelScope and NVIDIA list endpoints are OpenAI-style and were not run against a real key;
+ *   a failure shows up as a note, not a problem.)
+ * - Zhipu, Cloudflare: not checked (no keyless or documented list endpoint was verified).
  *   Uses the key for one read-only models call. Nothing is sent to any other host.
  */
 import { PRESETS } from '../packages/presets/src/index.ts'
@@ -57,7 +60,19 @@ async function checkMistral(): Promise<void> {
   for (const model of preset.models) if (!ids.has(model.id)) problems.push({ route: 'mistral', model: model.id, why: 'not in the models list' })
 }
 
-for (const check of [checkOpenRouter, checkGemini, checkMistral]) {
+/** OpenAI-style model list for the providers that expose one with a bearer key. Only these two, and only with a key set. */
+async function checkListed(route: string, envName: string, url: string): Promise<void> {
+  const key = process.env[envName]
+  const preset = PRESETS.find(p => p.route === route)
+  if (!key || !preset) { notes.push(`${route}: skipped (set ${envName} to check)`); return }
+  const body = await getJson(url, { authorization: `Bearer ${key}` }) as { data: { id: string }[] }
+  const ids = new Set(body.data.map(m => m.id))
+  for (const model of preset.models) if (!ids.has(model.id)) problems.push({ route, model: model.id, why: 'not in the models list' })
+}
+const checkModelScope = (): Promise<void> => checkListed('modelscope', 'MODELSCOPE_ACCESS_TOKEN', 'https://api-inference.modelscope.cn/v1/models')
+const checkNvidia = (): Promise<void> => checkListed('nvidia', 'NVIDIA_API_KEY', 'https://integrate.api.nvidia.com/v1/models')
+
+for (const check of [checkOpenRouter, checkGemini, checkMistral, checkModelScope, checkNvidia]) {
   try { await check() } catch (error) { notes.push(`${check.name}: ${(error as Error).message}`) }
 }
 for (const note of notes) console.log(note)

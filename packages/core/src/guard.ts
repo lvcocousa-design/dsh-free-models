@@ -34,7 +34,7 @@ export function checkEntry(
   if (preset === undefined) {
     return { ok: false, reason: 'unknown-route', detail: `route "${entry.route}" has no free-tier preset` }
   }
-  if (preset.deniedModels?.includes(entry.model)) {
+  if (preset.deniedModels?.some(denied => denied.toLowerCase() === entry.model.toLowerCase())) {
     return { ok: false, reason: 'denied-model', detail: `${entry.route}/${entry.model} is a paid model` }
   }
   if (preset.requiredModelSuffix !== undefined && !entry.model.endsWith(preset.requiredModelSuffix)) {

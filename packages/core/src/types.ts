@@ -65,6 +65,14 @@ export interface ProviderPreset {
   docsUrl: string
   /** Date (YYYY-MM-DD) the numbers were last checked against the docs. */
   verifiedAt: string
+  /** Account conditions the user must meet before the free tier works (real-name check, linked cloud account...). */
+  requirements?: string
+  /** Credentials besides the key that dsh must hold under these names (for example an account id). Names only. */
+  extraCredentials?: readonly { env: string; hint: string }[]
+  /** Set when dsh's pi-ai does not ship this route: the user declares it once with these values. */
+  customRoute?: { api: 'openai-completions'; baseURL: string }
+  /** True when the preset is available but not part of the default chain. */
+  offByDefault?: boolean
 }
 
 /** One slot in the user's fallback chain. */
