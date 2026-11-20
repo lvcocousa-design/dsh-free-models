@@ -6,7 +6,7 @@ const guard = { forbidBillableCalls: true, confirmedNoBilling: new Set<string>()
 
 describe('provider expansion', () => {
   it('puts Zhipu first and keeps the optional providers out of the default chain', () => {
-    expect(DEFAULT_CHAIN.map(e => e.route)).toEqual(['zhipu', 'google', 'google', 'openrouter', 'openrouter', 'mistral'])
+    expect(DEFAULT_CHAIN.map(e => e.route)).toEqual(['zhipu', 'zhipu-intl', 'google', 'google', 'openrouter', 'openrouter', 'mistral'])
     const optional = PRESETS.filter(p => p.offByDefault === true).map(p => p.route).sort()
     expect(optional).toEqual(['cloudflare-workers-ai', 'modelscope', 'nvidia'])
     for (const route of optional) expect(DEFAULT_CHAIN.map(e => e.route)).not.toContain(route)
@@ -20,6 +20,21 @@ describe('provider expansion', () => {
     }
     expect(checkEntry({ route: 'zhipu', model: 'glm-4.7-flash' }, presets, guard).ok).toBe(true)
     expect(checkEntry({ route: 'zhipu', model: 'glm-4.5-air' }, presets, guard).ok).toBe(false)
+  })
+
+  it('adds the international Zhipu route with its own key name, endpoint and denied models', () => {
+    const presets = presetMap()
+    const intl = presets.get('zhipu-intl')!
+    expect(intl.customRoute?.baseURL).toBe('https://api.z.ai/api/paas/v4')
+    expect(intl.apiKeyEnv).not.toBe('ZAI_API_KEY') // that name is dsh's Coding Plan key
+    expect(intl.overage).toBe('reject')
+    expect(intl.trainsOnFreeTierData).toBe(false)
+    expect(intl.requirements).toMatch(/does not say|no explicit promise/i)
+    for (const model of ['glm-5.3-flash', 'GLM-5.3-FlashX', 'glm-4.7-flashx', 'glm-4.6v-flashx']) {
+      expect(checkEntry({ route: 'zhipu-intl', model }, presets, guard).ok, model).toBe(false)
+    }
+    for (const model of ['glm-4.7-flash', 'glm-4.5-flash']) expect(checkEntry({ route: 'zhipu-intl', model }, presets, guard).ok, model).toBe(true)
+    expect(presets.get('zhipu')!.apiKeyEnv).not.toBe(intl.apiKeyEnv)
   })
 
   it('never lists a model Cloudflare says needs a paid plan', () => {
@@ -40,7 +55,7 @@ describe('provider expansion', () => {
 
   it('declares custom routes only for providers dsh does not ship, over https', () => {
     for (const p of PRESETS) if (p.customRoute !== undefined) expect(p.customRoute.baseURL).toMatch(/^https:\/\//)
-    expect(PRESETS.filter(p => p.customRoute !== undefined).map(p => p.route).sort()).toEqual(['modelscope', 'zhipu'])
+    expect(PRESETS.filter(p => p.customRoute !== undefined).map(p => p.route).sort()).toEqual(['modelscope', 'zhipu', 'zhipu-intl'])
   })
 
   it('understands Zhipu error wording', () => {

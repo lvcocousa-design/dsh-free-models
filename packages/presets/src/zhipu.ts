@@ -14,7 +14,7 @@ import type { ProviderPreset } from '@dsh-free-models/core'
  */
 export const zhipu: ProviderPreset = {
   route: 'zhipu',
-  displayName: 'Zhipu BigModel (GLM-4.7-Flash, free)',
+  displayName: 'Zhipu BigModel, China site (GLM-4.7-Flash, free)',
   apiKeyEnv: 'ZHIPU_API_KEY',
   overage: 'reject',
   resetPolicy: 'unknown',
@@ -31,6 +31,6 @@ export const zhipu: ProviderPreset = {
   docsUrl: 'https://open.bigmodel.cn/pricing',
   verifiedAt: '2026-11-20',
   requirements:
-    'Create an account at open.bigmodel.cn. Real-name verification may be required before calls work (not confirmed from the official pages). The concurrency limit is shown in the console and is not published. No official statement about training on prompts was found.',
+    'China site (open.bigmodel.cn). The official FAQ says calling the API does not require real-name verification (recommended, not forced), and overseas phone numbers can register. The concurrency limit is shown in the console and is not published. No official statement about training on prompts was found.',
   customRoute: { api: 'openai-completions', baseURL: 'https://open.bigmodel.cn/api/paas/v4/' },
 }

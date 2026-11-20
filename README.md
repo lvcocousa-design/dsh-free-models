@@ -4,7 +4,7 @@ English | [中文](#中文说明)
 
 Free-tier model fallback for [DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness).
 It adds one virtual provider, `free-auto`. A request goes to the first available free-tier model in your
-chain (default: Zhipu GLM-4.7-Flash, then Gemini, then OpenRouter `:free` models, then Mistral). If that provider is out of
+chain (default: Zhipu GLM-4.7-Flash on the China site, then the same model on Z.ai international, then Gemini, then OpenRouter `:free` models, then Mistral). If that provider is out of
 quota, the request moves to the next one. A settings page shows the order, each provider's status and
 today's usage.
 
@@ -62,7 +62,8 @@ Use a fresh or billing-free account. Enter each key on dsh's **Models** page und
 | Gemini | https://aistudio.google.com/apikey | Pick a Google Cloud project with no billing account linked. |
 | OpenRouter | https://openrouter.ai/settings/keys | Do not buy credits if you want a hard stop. Free models: 20 requests/min, 50/day (1000/day after a one-time $10 purchase, which this plugin does not assume). |
 | Mistral | https://console.mistral.ai/api-keys | Keep the workspace in Free mode. |
-| Zhipu (default chain, first) | https://open.bigmodel.cn/usercenter/apikeys/ | Free model: GLM-4.7-Flash only. Real-name verification may be asked for. Other Flash models are billed and are blocked by the plugin. |
+| Zhipu, China site `zhipu` (default chain, first) | https://open.bigmodel.cn/usercenter/apikeys/ | Free model: GLM-4.7-Flash. Per the official FAQ, calling the API does **not require real-name verification** (it is recommended, not forced), and overseas phone numbers can register. Other Flash models are billed and are blocked by the plugin. |
+| Z.ai international `zhipu-intl` (default chain, second) | https://docs.z.ai/guides/develop/http/introduction | Register on the Z.ai platform and create a **standard API key**. Do **not** use a GLM Coding Plan key: since 2026-10-16 the two key types do not work for each other. Free models: GLM-4.7-Flash, GLM-4.5-Flash. The official pages list no real-name or card requirement for free models (I did not sign up to test it). |
 | Groq (optional, off by default) | https://console.groq.com/keys | Free plan only. Small token limits make it fit short tasks, not long agent runs. |
 | Cloudflare Workers AI (optional, off by default) | https://developers.cloudflare.com/fundamentals/api/get-started/create-token/ | Needs a Workers AI API token **and** your account id. Stay on the Free Workers plan. |
 | ModelScope (optional, off by default) | https://modelscope.cn/my/myaccesstoken | Non-commercial. The account must be linked to a real-name-verified Alibaba Cloud account. |
@@ -72,7 +73,8 @@ Use a fresh or billing-free account. Enter each key on dsh's **Models** page und
 
 | Provider | Free allowance used by the plugin | Resets | Overage |
 | --- | --- | --- | --- |
-| Zhipu GLM-4.7-Flash | Free model, limited by concurrency (requests in flight); the number is only in your console | n/a | Refuses (429); a free model has no billing path |
+| Zhipu GLM-4.7-Flash (China) | Free model, limited by concurrency (requests in flight); the number is only in your console | n/a | Refuses (429); a free model has no billing path |
+| Z.ai GLM-4.7-Flash / 4.5-Flash (international) | Free models, limited by concurrency; the number is shown after login at z.ai/manage-apikey/rate-limits | n/a | Refuses (429); no billing path for free models |
 | Gemini | Per model and per project; see AI Studio for your numbers (not hard-coded) | Pacific midnight | Refuses (429) with no billing; bills if billing is linked |
 | OpenRouter `:free` | 20/min, 50/day across all free models | UTC midnight | Refuses (429) |
 | Mistral | Free mode, lowest limits; no official numbers (not hard-coded) | Unknown, so the plugin backs off and retries | Refuses in Free mode |
@@ -81,7 +83,7 @@ Use a fresh or billing-free account. Enter each key on dsh's **Models** page und
 | ModelScope | Metered in "Magic Beans" per call; the official page no longer states a daily number | Unknown | Refuses |
 | NVIDIA | about 40 requests per minute per account | n/a | No per-token billing; past the limit NVIDIA points to paid deployment |
 
-Sources and check date (2026-11-20): Zhipu https://open.bigmodel.cn/pricing , Cloudflare
+Sources and check date (2026-11-20): Zhipu https://open.bigmodel.cn/pricing , Z.ai https://docs.z.ai/guides/overview/pricing , Cloudflare
 https://developers.cloudflare.com/workers-ai/platform/pricing/ , ModelScope
 https://www.modelscope.cn/docs/model-service/API-Inference/limits.md , NVIDIA https://build.nvidia.com/search .
 
@@ -89,7 +91,16 @@ Excluded on purpose: Cerebras (a trial that needs a payment method) and GitHub M
 
 ## Zhipu, ModelScope, Cloudflare and NVIDIA
 
-**Zhipu and ModelScope** are not routes that dsh ships, so declare each once in the pi-ai plugin row of your
+**China site vs international site.** `zhipu` is open.bigmodel.cn (yuan, China phone login, overseas numbers accepted).
+`zhipu-intl` is z.ai (USD, separate account and key, run from Singapore). They are separate accounts with separate
+keys and concurrency limits, so they back each other up in the default chain. Real-name verification: the China site's
+official FAQ says it is not required for API calls (https://docs.bigmodel.cn/cn/faq/authentication-issues); the
+international pages list no such requirement.
+Privacy: for API use, Z.ai's data addendum says it does not store the content you send or receive. It makes **no explicit
+promise that content is never used for training**, so do not treat it as one. For the China site I found no official statement either way.
+The key name for the international route is `ZAI_STANDARD_API_KEY`, not `ZAI_API_KEY` (dsh uses that one for the Coding Plan).
+
+**Zhipu (both sites) and ModelScope** are not routes that dsh ships, so declare each once in the pi-ai plugin row of your
 profile (merge with the providers you already have). The key goes under the credential name, never in the file:
 
 ```yaml
@@ -100,6 +111,12 @@ profile (merge with the providers you already have). The key goes under the cred
         apiKeyEnv: ZHIPU_API_KEY
         api: openai-completions
         baseURL: https://open.bigmodel.cn/api/paas/v4/
+        models:
+          - { id: glm-4.7-flash, name: GLM-4.7-Flash, contextWindow: 200000 }
+      zhipu-intl:   # Z.ai international, standard API key (not a Coding Plan key)
+        apiKeyEnv: ZAI_STANDARD_API_KEY
+        api: openai-completions
+        baseURL: https://api.z.ai/api/paas/v4
         models:
           - { id: glm-4.7-flash, name: GLM-4.7-Flash, contextWindow: 200000 }
       modelscope:   # optional
@@ -113,8 +130,8 @@ profile (merge with the providers you already have). The key goes under the cred
 Provide the key as an environment variable of that name (tested in the end-to-end test). Storing it through dsh's
 credential store under the same name should work the same way, but I have not run that path.
 If a route is not declared, the router skips it (it shows as stopped with "route is not set up in dsh") and uses the next entry.
-The plugin only calls models its presets list. For Zhipu that is `glm-4.7-flash`; `glm-5.3-flash`, `glm-5.3-flashx`
-and `glm-4.6v-flashx` are refused because they are billed.
+The plugin only calls models its presets list. For Zhipu that is `glm-4.7-flash` (the international preset also lists `glm-4.5-flash`, not in the default chain); `glm-5.3-flash`, `glm-5.3-flashx`,
+`glm-4.7-flashx` and `glm-4.6v-flashx` are refused because they are billed. If you declare only one of the two Zhipu routes, the other is skipped.
 
 **Cloudflare** and **NVIDIA** are routes dsh already ships (`cloudflare-workers-ai`, `nvidia`). Cloudflare needs two
 credential names: `CLOUDFLARE_API_KEY` (an API token with Workers AI permission) and `CLOUDFLARE_ACCOUNT_ID`.
@@ -218,7 +235,7 @@ License: MIT.
 
 给 [DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness) 用的免费额度模型回退插件。非官方社区项目。
 
-它提供一个虚拟提供商 `free-auto`：请求先发给链条里第一个可用的免费模型（默认先智谱 GLM-4.7-Flash，其次 Gemini，再次 OpenRouter 的 `:free` 模型，最后 Mistral），
+它提供一个虚拟提供商 `free-auto`：请求先发给链条里第一个可用的免费模型（默认先智谱国内站 GLM-4.7-Flash，再智谱国际站 Z.ai 的同一模型，其次 Gemini，再次 OpenRouter 的 `:free` 模型，最后 Mistral），
 某家额度用完就自动换下一家。设置页可以调整顺序、查看各家状态和今日用量。
 
 ### 先看这几条
@@ -257,7 +274,8 @@ dsh --profile <名称>
 | Gemini | https://aistudio.google.com/apikey | 选择没有关联结算账号的 Google Cloud 项目 |
 | OpenRouter | https://openrouter.ai/settings/keys | 想要硬性停止就不要充值。免费模型每分钟 20 次、每天 50 次 |
 | Mistral | https://console.mistral.ai/api-keys | 保持 Free 模式 |
-| 智谱（默认链第一位） | https://open.bigmodel.cn/usercenter/apikeys/ | 免费的只有 GLM-4.7-Flash。可能要求实名认证。其他 Flash 型号收费，插件会拒绝调用 |
+| 智谱国内站 `zhipu`（默认链第一位） | https://open.bigmodel.cn/usercenter/apikeys/ | 免费模型 GLM-4.7-Flash。官方 FAQ 写明调用 API **不强制实名认证**（建议但不强制），支持海外手机号注册。其他 Flash 型号收费，插件会拒绝调用 |
+| 智谱国际站 Z.ai `zhipu-intl`（默认链第二位） | https://docs.z.ai/guides/develop/http/introduction | 在 Z.ai 平台注册并创建**标准 API Key**，**不要**用 GLM Coding Plan 的 Key（2026-10-16 起两种 Key 互不通用）。免费模型 GLM-4.7-Flash、GLM-4.5-Flash。官方页面没有写免费模型需要实名或绑卡（我没有实际注册验证） |
 | Groq（可选，默认不启用） | https://console.groq.com/keys | 只用 Free 计划，token 限额小，适合短任务 |
 | Cloudflare Workers AI（可选，默认不启用） | https://developers.cloudflare.com/fundamentals/api/get-started/create-token/ | 需要有 Workers AI 权限的 API Token **和**账号 ID，保持 Free Workers 计划 |
 | 魔搭 ModelScope（可选，默认不启用） | https://modelscope.cn/my/myaccesstoken | 仅限非商业。账号要绑定已实名认证的阿里云账号 |
@@ -267,11 +285,18 @@ dsh --profile <名称>
 
 ### 智谱、魔搭、Cloudflare、NVIDIA
 
+**国内站和国际站。** `zhipu` 是 open.bigmodel.cn（人民币，手机号登录，支持海外号码）；`zhipu-intl` 是 z.ai（美元，独立账号和 Key，服务从新加坡提供）。
+两边账号、Key、并发限制各自独立，所以在默认链里互相兜底。实名认证：国内站官方 FAQ 写明调用 API 不强制
+（https://docs.bigmodel.cn/cn/faq/authentication-issues）；国际站官方页面没有这项要求。
+隐私：Z.ai 的 API 数据处理补充协议写明不存储你发送和生成的内容，但**没有明确承诺不用于训练**，不要当成这个承诺。国内站我没找到官方说明。
+国际站路由的凭据名是 `ZAI_STANDARD_API_KEY`，不是 `ZAI_API_KEY`（dsh 用后者放 Coding Plan 的 Key）。
+
 **限额概览（核对日期 2026-11-20，官方页面）：**
 
 | 提供商 | 免费额度 | 用尽后 |
 | --- | --- | --- |
-| 智谱 GLM-4.7-Flash | 免费模型，按并发数限制，数字只在控制台可见 | 返回 429，没有计费通道 |
+| 智谱国内站 GLM-4.7-Flash | 免费模型，按并发数限制，数字只在控制台可见 | 返回 429，没有计费通道 |
+| 智谱国际站 Z.ai GLM-4.7-Flash / 4.5-Flash | 免费模型，按并发数限制，数字登录后在 z.ai/manage-apikey/rate-limits 查看 | 返回 429，免费模型没有计费通道 |
 | Cloudflare | 每个账号每天 1 万 Neurons，UTC 0 点重置（按价目表我估算约 10 万 token，非官方数字） | 免费计划直接失败；**Workers Paid 计划会扣费** |
 | 魔搭 | 按“魔粒”计量，官方页面不再公布每日数字 | 拒绝调用 |
 | NVIDIA | 每个账号约每分钟 40 次 | 没有按 token 计费，超出后官方引导到付费部署 |
@@ -288,6 +313,12 @@ dsh --profile <名称>
         baseURL: https://open.bigmodel.cn/api/paas/v4/
         models:
           - { id: glm-4.7-flash, name: GLM-4.7-Flash, contextWindow: 200000 }
+      zhipu-intl:   # Z.ai 国际站，标准 API Key（不是 Coding Plan 的 Key）
+        apiKeyEnv: ZAI_STANDARD_API_KEY
+        api: openai-completions
+        baseURL: https://api.z.ai/api/paas/v4
+        models:
+          - { id: glm-4.7-flash, name: GLM-4.7-Flash, contextWindow: 200000 }
       modelscope:   # 可选
         apiKeyEnv: MODELSCOPE_ACCESS_TOKEN
         api: openai-completions
@@ -298,7 +329,7 @@ dsh --profile <名称>
 
 密钥用同名环境变量提供（端到端测试验证过这条路径）。通过 dsh 凭据库按同名保存应该同样有效，但我没有跑过。
 没声明的路由会被跳过（显示为已停用，原因里写“route is not set up in dsh”），自动用下一个条目。
-插件只调用预设里列出的模型。智谱只有 `glm-4.7-flash`；`glm-5.3-flash`、`glm-5.3-flashx`、`glm-4.6v-flashx` 因为收费被拒绝。
+插件只调用预设里列出的模型。智谱只有 `glm-4.7-flash`（国际站预设另有 `glm-4.5-flash`，不在默认链里）；`glm-5.3-flash`、`glm-5.3-flashx`、`glm-4.7-flashx`、`glm-4.6v-flashx` 因为收费被拒绝。两条智谱路由只声明了一条时，另一条会被跳过。
 
 **Cloudflare 和 NVIDIA** 是 dsh 已有的路由（`cloudflare-workers-ai`、`nvidia`）。Cloudflare 需要两个凭据名：`CLOUDFLARE_API_KEY`（有 Workers AI 权限的 API Token）
 和 `CLOUDFLARE_ACCOUNT_ID`。账号 ID 在 Cloudflare 控制台 Workers & Pages 页面右侧的 “Account ID”。它不是机密，但 dsh 用它拼接请求地址。
@@ -318,7 +349,6 @@ Cloudflare 官方说明不会用 Workers AI 的内容训练模型，也不保留
 合规提示：**NVIDIA** 仅限试用、不得用于生产，条款允许 NVIDIA 用你的内容改进产品，所以打开 `sensitiveRequests` 时会被跳过。
 **魔搭**仅限非商业使用，不能用于生产。魔搭会下架旧模型，模型清单会变。`pnpm check:models` 在设置了 `MODELSCOPE_ACCESS_TOKEN` / `NVIDIA_API_KEY` 时会检查这两家，
 智谱和 Cloudflare 脚本不检查。魔搭和 NVIDIA 的模型是否支持工具调用，官方页面没写，所以标为“未核实”。
-智谱可能要求实名认证（官方页面没写清）；官方没有找到关于是否用提示词训练的说明。
 
 ### 切换规则
 

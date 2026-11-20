@@ -121,6 +121,66 @@ describe('free-auto over the real pi-ai adapter', () => {
     } finally { await ctx.fiber.dispose() }
   })
 
+  describe('zhipu (China) and zhipu-intl as hand-declared pi-ai routes', () => {
+    async function buildBoth(cn: string, intl: string, orUrl: string) {
+      vi.stubEnv('FM_OR_KEY', 'k1'); vi.stubEnv('FM_CN_KEY', 'k2'); vi.stubEnv('FM_INTL_KEY', 'k3')
+      const ctx = new Context()
+      await ctx.plugin(LlmRuntime)
+      const declared = (key: string, url: string) => ({
+        apiKeyEnv: key, api: 'openai-completions', baseURL: url,
+        models: [{ id: 'glm-4.7-flash', name: 'GLM-4.7-Flash', contextWindow: 200000 }],
+      })
+      await ctx.plugin(LlmPiAi, { providers: { openrouter: { apiKeyEnv: 'FM_OR_KEY', baseURL: orUrl }, zhipu: declared('FM_CN_KEY', cn), 'zhipu-intl': declared('FM_INTL_KEY', intl) } })
+      const router = new FreeRouterAdapter({
+        stream: options => ctx.llm.stream(options),
+        settings: () => settings({
+          chain: [
+            { route: 'zhipu', model: 'glm-4.7-flash', enabled: true },
+            { route: 'zhipu-intl', model: 'glm-4.7-flash', enabled: true },
+            { route: 'openrouter', model: 'google/gemma-4-31b-it:free', enabled: true },
+          ],
+        }),
+        presets: presetMap(PRESETS),
+        tracker: new QuotaTracker(PRESETS.map(p => ({ route: p.route, resetPolicy: p.resetPolicy, limits: p.limits }))),
+      })
+      ctx.llm.registerAdapter([FREE_ROUTE], router)
+      const run = async (): Promise<StreamChunk[]> => {
+        const chunks: StreamChunk[] = []
+        for await (const chunk of ctx.llm.stream({
+          provider: FREE_ROUTE, model: 'auto',
+          messages: [createUserMessage({ content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' } } as never)],
+        })) chunks.push(chunk)
+        return chunks
+      }
+      return { ctx, run }
+    }
+    const limited = () => ({ status: 429, body: JSON.stringify({ error: { code: '1302', message: 'Rate limit reached for requests' } }) })
+    const fine = (name: string) => () => ({ status: 200, body: textStream(name), sse: true })
+
+    it('falls back from the China route to the international route, and only then to OpenRouter', async () => {
+      const cn = await provider(limited)
+      const intl = await provider(fine('from intl'))
+      const or = await provider(fine('from openrouter'))
+      const { ctx, run } = await buildBoth(cn.url, intl.url, or.url)
+      try {
+        expect(text(await run())).toBe('from intl')
+        expect(cn.hits()).toBe(1)
+        expect(or.hits()).toBe(0)
+      } finally { await ctx.fiber.dispose() }
+    })
+
+    it('reaches OpenRouter when both Zhipu routes refuse', async () => {
+      const cn = await provider(limited)
+      const intl = await provider(limited)
+      const or = await provider(fine('from openrouter'))
+      const { ctx, run } = await buildBoth(cn.url, intl.url, or.url)
+      try {
+        expect(text(await run())).toBe('from openrouter')
+        expect([cn.hits(), intl.hits()]).toEqual([1, 1])
+      } finally { await ctx.fiber.dispose() }
+    })
+  })
+
   describe('zhipu as a hand-declared pi-ai route', () => {
     async function buildZhipu(zhipuUrl: string | undefined, orUrl: string) {
       vi.stubEnv('FM_OR_KEY', 'k1')
