@@ -1,0 +1,11 @@
+{
+  "name": "@dsh-free-models/core",
+  "version": "0.1.0",
+  "description": "Pure logic for quota-aware free-tier model fallback: failure classification, quota tracking, reset times, chain selection and the no-billing guard.",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": { ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" } },
+  "files": ["lib", "src"]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "dsh-free-models",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "check:models": "tsx scripts/check-models.ts"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "~4.1.0",
+    "@deepseek-ai/cosmokit": "~1.9.0",
+    "@deepseek-ai/dsh-credentials": "next",
+    "@deepseek-ai/dsh-llm": "next",
+    "@deepseek-ai/dsh-llm-pi-ai": "next",
+    "@deepseek-ai/schemastery": "latest",
+    "@types/node": "^22",
+    "tsx": "^4",
+    "typescript": "^5.9",
+    "vitest": "^4"
+  }
+}

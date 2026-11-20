@@ -1,0 +1,12 @@
+{
+  "name": "@dsh-free-models/presets",
+  "version": "0.1.0",
+  "description": "Free-tier descriptions for Google Gemini, OpenRouter, Mistral and Groq, with limits, billing behavior and the date each was checked.",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": { ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" } },
+  "files": ["lib", "src"],
+  "dependencies": { "@dsh-free-models/core": "workspace:*" }
+}

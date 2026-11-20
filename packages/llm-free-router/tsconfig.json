@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib",
+    "tsBuildInfoFile": "lib/.tsbuildinfo",
+    "emitDeclarationOnly": false,
+    "noEmit": false
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../presets"
+    }
+  ]
+}

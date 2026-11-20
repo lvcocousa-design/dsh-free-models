@@ -1,0 +1,18 @@
+{
+  "name": "@dsh-free-models/llm-free-router",
+  "version": "0.1.0",
+  "description": "A dsh LLM adapter that serves one virtual route, free-auto, and falls back across free-tier providers when one runs out.",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": { ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" } },
+  "files": ["lib", "src"],
+  "dependencies": { "@dsh-free-models/core": "workspace:*", "@dsh-free-models/presets": "workspace:*" },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.1.0",
+    "@deepseek-ai/dsh-llm": ">=0.2.2-rc.5 <0.3.0",
+    "@deepseek-ai/cosmokit": "~1.9.0",
+    "@deepseek-ai/schemastery": "~3.19.0"
+  }
+}
