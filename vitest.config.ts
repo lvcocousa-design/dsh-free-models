@@ -11,5 +11,5 @@ export default defineConfig({
       '@dsh-free-models/llm-free-router': src('llm-free-router'),
     },
   },
-  test: { include: ['packages/*/tests/**/*.spec.ts'], exclude: ['**/*.live.spec.ts'] },
+  test: { include: ['packages/*/tests/**/*.spec.{ts,tsx}'], exclude: ['**/*.live.spec.ts'] },
 })

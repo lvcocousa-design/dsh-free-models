@@ -1,0 +1,3 @@
+- insert:
+    - id: free-models-ui
+      name: '@dsh-free-models/client-ui'

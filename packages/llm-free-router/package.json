@@ -6,13 +6,33 @@
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
-  "exports": { ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" } },
-  "files": ["lib", "src"],
-  "dependencies": { "@dsh-free-models/core": "workspace:*", "@dsh-free-models/presets": "workspace:*" },
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    }
+  },
+  "files": [
+    "lib",
+    "src",
+    "cordis.patch.yml"
+  ],
+  "dependencies": {
+    "@dsh-free-models/core": "workspace:*",
+    "@dsh-free-models/presets": "workspace:*"
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.1.0",
     "@deepseek-ai/dsh-llm": ">=0.2.2-rc.5 <0.3.0",
     "@deepseek-ai/cosmokit": "~1.9.0",
     "@deepseek-ai/schemastery": "~3.19.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.2-rc.5 <0.3.0"
   }
 }

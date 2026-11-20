@@ -7,7 +7,8 @@
   "scripts": {
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "check:models": "tsx scripts/check-models.ts"
+    "check:models": "tsx scripts/check-models.ts",
+    "build": "tsc -b && pnpm --filter @dsh-free-models/client-ui build"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "~4.1.0",

@@ -1,0 +1,3 @@
+- insert:
+    - id: llm-free-router
+      name: '@dsh-free-models/llm-free-router'
