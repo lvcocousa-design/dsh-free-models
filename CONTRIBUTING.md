@@ -17,5 +17,4 @@ request, and keys are never stored by this plugin. Include a test with any chang
 
 ## CI
 
-The workflow files are in `docs/ci/`. GitHub only accepts them under `.github/workflows/`, and pushing there needs a
-token with the `workflow` scope, so copy them over in the web editor (or push with such a token).
+`.github/workflows/ci.yml` runs install, typecheck, test and build on every push and pull request. `check-models.yml` runs `pnpm check:models` every Monday and fails when a preset model is gone or no longer free.
