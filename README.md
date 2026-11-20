@@ -87,7 +87,7 @@ Excluded on purpose: Cerebras (a trial that needs a payment method) and GitHub M
 
 ## Settings page
 
-Open **Settings > Free models** (also reachable from the Plugins page). You can reorder and toggle the fallback chain,
+Open **Settings > Free models**. You can reorder and toggle the fallback chain,
 add presets, see status and today's request count per provider, confirm "no billing attached", turn the
 billing guard and sensitive-code options on or off, and set the minimum context. "Skip Gemini" turns off every
 Gemini entry in one click. Strings are in English and Chinese.
