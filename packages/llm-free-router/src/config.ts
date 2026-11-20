@@ -31,6 +31,8 @@ export const Config = z.object({
     .description('Skip providers whose free tier may use prompts to improve their products.'),
   switchPolicy: z.union([z.const('priority'), z.const('sticky')]).default('priority').volatile()
     .description('priority: always prefer the first available entry. sticky: stay on the entry that last worked.'),
+  statusPage: z.boolean().default(true).volatile()
+    .description('Serve the usage counters the settings page shows, at /free-models/status.'),
   softLimitRatio: z.number().min(0.1).max(1).default(0.8).volatile()
     .description('Stop using a provider at this share of its published daily allowance.'),
 })

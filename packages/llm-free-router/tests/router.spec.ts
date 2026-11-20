@@ -273,3 +273,23 @@ describe('cross-provider history', () => {
     expect(source && 'replayState' in source).toBe(false)
   })
 })
+
+describe('status report', () => {
+  it('reports usage and exhaustion without leaking anything but counters', async () => {
+    const { buildStatus } = await import('../src/status.ts')
+    const { PRESETS } = await import('@dsh-free-models/presets')
+    const t = await setup()
+    t.providers.script('google', failBefore('QUOTA', 'quota'))
+    t.providers.script('openrouter', ok('o'))
+    await t.run()
+    const report = buildStatus('free-auto', PRESETS, t.tracker, Date.now())
+    const google = report.providers.find(p => p.route === 'google')
+    const gModel = google?.models.find(m => m.id === 'gemini-4-hydrogen')
+    expect(gModel?.status).toBe('exhausted')
+    expect(google?.status).toBe('ok') // sibling Gemini models still have quota
+    const openrouter = report.providers.find(p => p.route === 'openrouter')
+    expect(gModel?.until).toBeGreaterThan(0)
+    expect(openrouter?.usage.requests).toBe(1)
+    expect(JSON.stringify(report)).not.toMatch(/sk-|AIza|Bearer/)
+  })
+})

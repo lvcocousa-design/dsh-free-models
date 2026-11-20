@@ -13,6 +13,7 @@
     "@deepseek-ai/cordis": "~4.1.0",
     "@deepseek-ai/cosmokit": "~1.9.0",
     "@deepseek-ai/dsh-credentials": "next",
+    "@deepseek-ai/dsh-host-webserver": "0.2.2-rc.5",
     "@deepseek-ai/dsh-llm": "next",
     "@deepseek-ai/dsh-llm-pi-ai": "next",
     "@deepseek-ai/schemastery": "latest",

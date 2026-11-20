@@ -1,15 +1,19 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-llm'
+import type {} from '@deepseek-ai/dsh-host-webserver'
 import { QuotaTracker } from '@dsh-free-models/core'
 import type { GuardSettings } from '@dsh-free-models/core'
 import { PRESETS, presetMap } from '@dsh-free-models/presets'
 import { Config, FREE_MODEL, FREE_ROUTE } from './config.ts'
 import { FreeRouterAdapter } from './router.ts'
+import { STATUS_PATH, buildStatus, statusResource } from './status.ts'
 import type { RouterEvent, RouterSettings } from './router.ts'
 
 export { Config, FREE_MODEL, FREE_ROUTE } from './config.ts'
 export { FreeRouterAdapter } from './router.ts'
 export type { Attempt, RouterDeps, RouterEvent, RouterSettings } from './router.ts'
+export { STATUS_PATH, buildStatus, statusResource } from './status.ts'
+export type { ProviderStatus, StatusReport } from './status.ts'
 export { historyFor, wrapReplay } from './history.ts'
 
 export const name = 'llm-free-router'
@@ -53,4 +57,18 @@ export function apply(ctx: Context, config: Config): void {
     },
   })
   ctx.effect(() => ctx.llm.registerAdapter([FREE_ROUTE], adapter), 'free-models: register free-auto route')
+  ctx.inject(['webServer'], (webCtx) => {
+    const serve = statusResource(() => buildStatus(FREE_ROUTE, presets.values(), tracker, Date.now()))
+    // Newer dsh builds take an `auth` field and enforce it; the 0.2.2-rc.5 server has no such field and
+    // serves every route to whoever can reach it. The page only exposes counters and public preset text.
+    const route = {
+      kind: 'exact' as const,
+      path: STATUS_PATH,
+      auth: 'required',
+      resource: async (request: Request) => config.statusPage.get()
+        ? await serve(request)
+        : new Response('disabled', { status: 404 }),
+    }
+    webCtx.effect(() => webCtx.webServer.register(route), 'free-models: status route')
+  })
 }
