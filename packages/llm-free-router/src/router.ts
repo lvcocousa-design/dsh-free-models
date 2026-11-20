@@ -180,7 +180,7 @@ export class FreeRouterAdapter extends LlmAdapter {
       ...rest,
       provider: route,
       model,
-      messages: historyFor(options.messages, route),
+      messages: historyFor(options.messages, route, model),
     })
     const held: StreamChunk[] = []
     let started = false

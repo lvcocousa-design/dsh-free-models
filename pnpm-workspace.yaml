@@ -1,4 +1,7 @@
 packages:
   - packages/*
-onlyBuiltDependencies:
-  - esbuild
+# esbuild builds the settings page bundle. The other two are pulled in by dsh packages and need no install script.
+allowBuilds:
+  esbuild: true
+  '@google/genai': false
+  protobufjs: false

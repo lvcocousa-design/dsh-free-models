@@ -35,12 +35,12 @@ function unwrap(state: unknown): { wrapped: WrappedReplay; blocks?: readonly unk
  *
  * Assistant messages produced by this router carry a wrapped replay state. Thinking
  * signatures and response ids are provider specific, so:
- * - a message the target route itself produced is handed back as that route's own
+ * - a message the target route and model produced is handed back as that route's own
  *   message, with its original replay state, so the provider sees a normal history;
- * - a message produced by a different route loses its replay state, and the provider
+ * - a message produced by a different route or model loses its replay state, and the provider
  *   receives it as plain content.
  */
-export function historyFor(messages: readonly RequestMessage[], route: string): RequestMessage[] {
+export function historyFor(messages: readonly RequestMessage[], route: string, model: string): RequestMessage[] {
   return messages.map((message): RequestMessage => {
     if (message.role !== 'assistant') return message
     const source = message.source
@@ -50,7 +50,8 @@ export function historyFor(messages: readonly RequestMessage[], route: string): 
       // Not ours (some other adapter's state under some other route): never forward it blindly.
       return { ...message, source: { kind: 'model', provider: source.provider, model: source.model } } as Message
     }
-    if (found.wrapped.route === route) {
+    // Signatures can be tied to the exact model, so a different model on the same route gets plain content too.
+    if (found.wrapped.route === route && found.wrapped.model === model) {
       return {
         ...message,
         source: {

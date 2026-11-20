@@ -24,6 +24,7 @@ const NS = 'settings.freeModels'
 /** Profile entry id of the llm-free-router plugin. Give the entry this id in your profile. */
 const ENTRY_ID = 'llm-free-router'
 const STATUS_URL = '/free-models/status'
+const RESET_URL = '/free-models/reset'
 
 export const inject = ['slots', 'locale', 'configForms']
 
@@ -50,6 +51,13 @@ export function apply(ctx: ClientContext): void {
     if (!response.ok) throw new Error(`status ${response.status}`)
     return await response.json() as StatusReport
   })
+  const reset = (route: string): void => {
+    void fetch(RESET_URL, {
+      method: 'POST', credentials: 'same-origin', cache: 'no-store',
+      headers: { 'content-type': 'application/json', 'x-free-models': '1' },
+      body: JSON.stringify({ route }),
+    }).then(() => status.refresh())
+  }
   const write = (field: string, value: unknown): void => { void form.set(field, value) }
 
   ctx.effect(() => ctx.configForms.whileServed([ENTRY_ID], () => ctx.slots.inject('settings.section', () => ctx.slots.register({
@@ -57,6 +65,6 @@ export function apply(ctx: ClientContext): void {
     id: 'free-models',
     order: 11,
     label: () => t('nav'),
-    inject: () => ({ hooks: { config, report: status }, write, t, now: () => Date.now() }),
+    inject: () => ({ hooks: { config, report: status }, write, reset, t, now: () => Date.now() }),
   }, FreeModelsPage as never))), 'free-models-ui: settings page')
 }

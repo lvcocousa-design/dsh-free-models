@@ -22,5 +22,28 @@
     "tsx": "^4",
     "typescript": "^5.9",
     "vitest": "^4"
-  }
+  },
+  "description": "Quota-aware free-tier model fallback for DeepSeek Harness (dsh).",
+  "packageManager": "pnpm@12.21.0",
+  "engines": {
+    "node": ">=24.9.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lvcocousa-design/dsh-free-models.git"
+  },
+  "homepage": "https://github.com/lvcocousa-design/dsh-free-models#readme",
+  "bugs": {
+    "url": "https://github.com/lvcocousa-design/dsh-free-models/issues"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "llm",
+    "free-tier",
+    "gemini",
+    "openrouter",
+    "mistral",
+    "plugin"
+  ]
 }

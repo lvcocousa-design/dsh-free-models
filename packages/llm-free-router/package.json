@@ -34,5 +34,16 @@
   },
   "engines": {
     "dsh": ">=0.2.2-rc.5 <0.3.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lvcocousa-design/dsh-free-models.git",
+    "directory": "packages/llm-free-router"
+  },
+  "homepage": "https://github.com/lvcocousa-design/dsh-free-models#readme",
+  "bugs": {
+    "url": "https://github.com/lvcocousa-design/dsh-free-models/issues"
+  },
+  "author": "dsh-free-models maintainers",
+  "private": true
 }

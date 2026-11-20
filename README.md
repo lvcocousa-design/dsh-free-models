@@ -18,7 +18,7 @@ This is an unofficial community plugin. It is not affiliated with DeepSeek, Goog
 - What the plugin does on top: it only sends calls to models its presets list as free; it requires the
   `:free` suffix on OpenRouter; it never sends Gemini models Google lists as not free (Gemini 4 Carbon,
   Argon, Neon, 3.1 Pro Preview); it stops using a provider at 80% of a published daily limit; it treats a
-  429 as "exhausted" until the reset time; it disables a route for good if a provider answers 402; and a global
+  429 as "exhausted" until the reset time; it stops using a route that answers 402 (payment request) until you press **Re-enable**; and a global
   switch (**on by default**) refuses anything that could be billable. Each provider must be confirmed once as
   "this account has no billing attached" before it is used.
 - Free tiers change. Numbers in `packages/presets` carry a `verifiedAt` date and some are marked
@@ -32,13 +32,15 @@ This is an unofficial community plugin. It is not affiliated with DeepSeek, Goog
 
 ## Compatibility
 
+Tooling: Node 24.9+ (as dsh requires), pnpm 12 (the repo pins it in `packageManager`; `pnpm install` is clean on it).
+
 Built and tested against dsh `0.2.2-rc.5` (npm tag `next`). The bundle declares `engines.dsh: >=0.2.2-rc.5 <0.3.0`.
 dsh is pre-1.0 and its plugin APIs move, so other versions are untested.
 
 ## Install
 
 ```sh
-git clone https://github.com/<you>/dsh-free-models && cd dsh-free-models
+git clone https://github.com/lvcocousa-design/dsh-free-models && cd dsh-free-models
 pnpm install
 pnpm build
 dsh plugin --profile <name> add ./packages/llm-free-router
@@ -82,20 +84,53 @@ Excluded on purpose: Cerebras (a trial that needs a payment method) and GitHub M
   new provider as plain content. When a turn lands on the same provider again it gets its own state back.
 - `contextWindow` reported to dsh is the smallest window in the usable chain (default minimum 128000 tokens).
   Long conversations that fit the first model may be refused by a smaller one in the chain.
-- When every entry is unavailable, the error says which ones and when the earliest recovers. A short wait is
-  reported as a rate limit, so dsh's retry plugin handles it; a daily exhaustion is reported as a quota error.
+- An invalid-request error (HTTP 400) is returned as is. It is not replayed on every provider.
+- A bad or missing key pauses that provider for one hour and then tries it again, so a corrected key works without
+  a restart. A payment request (HTTP 402) pauses it until you press **Re-enable** on the settings page (or restart dsh).
+- When every entry is unavailable, the error says which ones and when the earliest recovers. A wait of up to
+  10 s is reported as a rate limit with a retry delay, which dsh's retry plugin (`dsh-llm-retry`, if mounted)
+  retries within its default limits. A longer wait, such as a spent daily allowance, is reported as a quota error
+  and ends the turn with that message. (Read from the dsh source, `dsh-llm-retry` defaults; not run live.)
+
+## Configuration without the settings page
+
+Every setting is a field of the `llm-free-router` row. Edit it in the profile's `cordis.patch.yml`, or use the
+settings page, which writes the same fields. Defaults are safe: **Gemini and Mistral are skipped until you
+confirm "no billing attached"**, so on a first run set that yourself:
+
+```yaml
+- id: llm-free-router
+  config:
+    confirmedNoBilling: { google: true, mistral: true }   # only if those accounts have no billing attached
+```
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `chain` | Gemini (2 models), OpenRouter `:free` (2 models), Mistral Small | Ordered `{ route, model, enabled }` entries. Only models in the presets (or `:free` ids on OpenRouter) are allowed. |
+| `forbidBillableCalls` | `true` | Refuse anything that could be billed. |
+| `confirmedNoBilling` | `{}` | Per route, your statement that the account behind the key has no billing. Needed for `google`, `mistral`, `groq`. |
+| `allowBilling` | `{}` | Per route opt-in for providers that bill on their own. Needs `forbidBillableCalls: false`. No shipped preset needs it. |
+| `minContext` | `128000` | Skip models with a smaller context window. |
+| `sensitiveRequests` | `false` | Skip providers whose free tier may use prompts for training. Check which presets are flagged before turning it on, since it can leave no usable entry. |
+| `switchPolicy` | `priority` | `priority` or `sticky`. |
+| `softLimitRatio` | `0.8` | Stop using a provider at this share of its published daily limit (only where limits are published). |
+| `statusPage` | `true` | Serve usage counters at `/free-models/status`. |
 
 ## Settings page
 
 Open **Settings > Free models**. You can reorder and toggle the fallback chain,
-add presets, see status and today's request count per provider, confirm "no billing attached", turn the
+add presets, see status and today's request count per provider, confirm "no billing attached" (shown only for providers where billing depends on the account), re-enable a stopped provider, turn the
 billing guard and sensitive-code options on or off, and set the minimum context. "Skip Gemini" turns off every
 Gemini entry in one click. Strings are in English and Chinese.
 
 Usage counters are in memory and reset when dsh restarts. They come from `GET /free-models/status`. On
 `0.2.2-rc.5` the web server cannot require authentication for plugin routes, so anyone who can reach your dsh web
-port can read those counters (no keys, no prompts). Keep dsh bound to localhost, or set `statusPage: false` for
-the router row to turn the endpoint off. Newer dsh builds enforce the `auth: 'required'` the plugin requests.
+port can read those counters (no keys, no prompts). The "Try again" button posts to `/free-models/reset` (needs a custom header and refuses other origins). Keep dsh bound to localhost, or set
+`statusPage: false` for the router row to turn the status endpoint off. Newer dsh builds enforce the `auth: 'required'` the plugin requests.
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems as described in [SECURITY.md](SECURITY.md).
 
 ## Development
 
@@ -128,7 +163,7 @@ License: MIT.
 - **无法保证绝不扣费。** 是否收费由提供商和你的账号设置决定，不是本插件。请使用**没有绑定任何付费方式**的账号或项目申请密钥，
   这样到达上限时提供商只会返回 429，不会扣费。
 - 插件额外做了：只调用预设里标为免费的模型；OpenRouter 必须带 `:free` 后缀；Gemini 4 Carbon/Argon/Neon 和 3.1 Pro Preview 永远不会被调用；
-  达到公布的每日额度 80% 就停用该提供商；429 视为已耗尽直到重置；收到 402 就永久停用该路由；全局“禁止可能计费的调用”默认开启；
+  达到公布的每日额度 80% 就停用该提供商；429 视为已耗尽直到重置；收到 402 就停用该路由，直到你在设置页点“重新启用”；全局“禁止可能计费的调用”默认开启；
   每个提供商首次启用前必须确认“该账号没有绑定付费方式”。
 - 免费政策经常变化。预设里有核对日期，部分数字标为“未核实”。使用前先运行 `pnpm check:models`。
 - 多家免费层可能把你的提示词用于改进产品（Gemini 官方明确如此，其余按保守处理）。不能外传的代码不要发。
@@ -142,7 +177,7 @@ License: MIT.
 ### 安装
 
 ```sh
-git clone https://github.com/<你的用户名>/dsh-free-models && cd dsh-free-models
+git clone https://github.com/lvcocousa-design/dsh-free-models && cd dsh-free-models
 pnpm install
 pnpm build
 dsh plugin --profile <名称> add ./packages/llm-free-router

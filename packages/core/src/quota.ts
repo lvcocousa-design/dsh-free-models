@@ -15,6 +15,8 @@ export interface QuotaOptions {
   defaultRateCooldownMs?: number
   /** Cool-down after transient trouble. Default 15 s. */
   transientCooldownMs?: number
+  /** How long an auth failure disables a route before it is tried again. Default 1 h. */
+  authRetryMs?: number
 }
 
 const MINUTE = 60_000
@@ -32,6 +34,7 @@ export class QuotaTracker {
   private readonly softLimitRatio: number
   private readonly defaultRateCooldownMs: number
   private readonly transientCooldownMs: number
+  private readonly authRetryMs: number
   private readonly configs = new Map<string, QuotaRouteConfig>()
   private readonly states = new Map<string, RouteState>()
   private readonly minuteWindows = new Map<string, number[]>()
@@ -41,6 +44,7 @@ export class QuotaTracker {
     this.softLimitRatio = options.softLimitRatio ?? 0.8
     this.defaultRateCooldownMs = options.defaultRateCooldownMs ?? MINUTE
     this.transientCooldownMs = options.transientCooldownMs ?? 15_000
+    this.authRetryMs = options.authRetryMs ?? 3_600_000
     for (const route of routes) this.configs.set(route.route, route)
   }
 
@@ -55,7 +59,7 @@ export class QuotaTracker {
     const now = this.clock()
     const state = this.ensure(route, now)
     this.rollWindow(state, now)
-    if ((state.status === 'cooling' || state.status === 'exhausted') && state.until !== undefined && now >= state.until) {
+    if (state.status !== 'ok' && state.until !== undefined && now >= state.until) {
       state.status = 'ok'
       delete state.until
       delete state.reason
@@ -126,7 +130,8 @@ export class QuotaTracker {
         this.mark(state, 'disabled', undefined, 'provider asked for payment; disabled until re-enabled by hand')
         break
       case 'auth':
-        this.mark(state, 'disabled', undefined, 'credential missing, invalid or not authorized')
+        // Retried after an hour so a corrected key works without a restart; a bad key just fails again.
+        this.mark(state, 'disabled', now + this.authRetryMs, 'credential missing, invalid or not authorized')
         break
       default:
         break
@@ -140,6 +145,14 @@ export class QuotaTracker {
     state.status = 'ok'
     delete state.until
     delete state.reason
+  }
+
+  /** Clear the route's flag and every per-model key under it (`route/model`). */
+  resetRoute(route: string): void {
+    for (const key of [...this.states.keys()]) {
+      if (key === route || key.startsWith(`${route}/`)) this.reset(key)
+    }
+    this.reset(route)
   }
 
   /** State of every key seen so far plus every configured route. */

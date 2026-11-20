@@ -6,7 +6,28 @@
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
-  "exports": { ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" } },
-  "files": ["lib", "src"],
-  "dependencies": { "@dsh-free-models/core": "workspace:*" }
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    }
+  },
+  "files": [
+    "lib",
+    "src"
+  ],
+  "dependencies": {
+    "@dsh-free-models/core": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lvcocousa-design/dsh-free-models.git",
+    "directory": "packages/presets"
+  },
+  "homepage": "https://github.com/lvcocousa-design/dsh-free-models#readme",
+  "bugs": {
+    "url": "https://github.com/lvcocousa-design/dsh-free-models/issues"
+  },
+  "author": "dsh-free-models maintainers",
+  "private": true
 }

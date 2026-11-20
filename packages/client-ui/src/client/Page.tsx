@@ -17,6 +17,8 @@ export interface PageProps {
   useConfig: <R>(select: (snapshot: PageSnapshot) => R) => R
   useReport: <R>(select: (snapshot: StatusSnapshot) => R) => R
   write: (field: string, value: unknown) => void
+  /** Ask the router to try a disabled provider again. */
+  reset: (route: string) => void
   now: () => number
 }
 
@@ -44,7 +46,7 @@ function Bar(props: { ratio: number | undefined; color: string }) {
   )
 }
 
-function ProviderCard(props: { p: ProviderStatus; confirmed: boolean; writable: boolean; t: PageProps['t']; now: number; onConfirm: (value: boolean) => void }) {
+function ProviderCard(props: { p: ProviderStatus; confirmed: boolean; writable: boolean; t: PageProps['t']; now: number; onConfirm: (value: boolean) => void; onReset: () => void }) {
   const { p, t } = props
   const ratio = usageRatio(p)
   const back = untilText(p.until, props.now)
@@ -55,6 +57,12 @@ function ProviderCard(props: { p: ProviderStatus; confirmed: boolean; writable: 
         <strong>{p.displayName}</strong>
         <span style={{ color, fontWeight: 600 }}>{t(`status_${p.status}` as FreeModelsKey)}{back === undefined ? '' : ` · ${t('back')} ${back}`}</span>
       </div>
+      {p.status === 'disabled' ? (
+        <div style={{ ...row, color: BADGE.disabled }}>
+          <span style={{ flex: 1 }}>{t('disabledWhy')}: {p.reason ?? ''}</span>
+          <button type="button" style={button} onClick={props.onReset}>{t('reenable')}</button>
+        </div>
+      ) : null}
       <div style={muted}>{t('usageToday')}: {usageText(p)}</div>
       <Bar ratio={ratio} color={ratio !== undefined && ratio >= 0.8 ? BADGE.cooling : BADGE.ok} />
       <div style={muted}>{p.billingNotice}</div>
@@ -62,9 +70,11 @@ function ProviderCard(props: { p: ProviderStatus; confirmed: boolean; writable: 
       <div style={{ ...muted, marginTop: 4 }}>
         {t('keyRef')}: <code>{p.apiKeyEnv}</code> · <a href={p.keyUrl} target="_blank" rel="noreferrer">{t('getKey')}</a>
       </div>
-      <Check checked={props.confirmed} disabled={!props.writable} onChange={props.onConfirm}>
-        {t('confirmNoBilling')}{props.confirmed ? '' : ` (${t('confirmNeeded')})`}
-      </Check>
+      {p.overage === 'depends-on-account-billing' ? (
+        <Check checked={props.confirmed} disabled={!props.writable} onChange={props.onConfirm}>
+          {t('confirmNoBilling')}{props.confirmed ? '' : ` (${t('confirmNeeded')})`}
+        </Check>
+      ) : null}
       <div style={muted}>{p.models.map(m => `${m.name}${m.unverified ? ` (${t('unverified')})` : ''}`).join(' · ')}</div>
     </div>
   )
@@ -140,7 +150,7 @@ export function FreeModelsPage(props: PageProps) {
         ? <div style={muted}>{failed ? t('noStatus') : t('loading')}</div>
         : report.providers.map(p => (
           <ProviderCard key={p.route} p={p} t={t} now={now} writable={writable} confirmed={confirmed[p.route] === true}
-            onConfirm={v => { props.write('confirmedNoBilling', { ...confirmed, [p.route]: v }) }} />
+            onConfirm={v => { props.write('confirmedNoBilling', { ...confirmed, [p.route]: v }) }} onReset={() => { props.reset(p.route) }} />
         ))}
       <div style={muted}>{t('counterNote')}</div>
     </div>

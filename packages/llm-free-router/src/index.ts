@@ -6,13 +6,13 @@ import type { GuardSettings } from '@dsh-free-models/core'
 import { PRESETS, presetMap } from '@dsh-free-models/presets'
 import { Config, FREE_MODEL, FREE_ROUTE } from './config.ts'
 import { FreeRouterAdapter } from './router.ts'
-import { STATUS_PATH, buildStatus, statusResource } from './status.ts'
+import { RESET_PATH, STATUS_PATH, buildStatus, resetResource, statusResource } from './status.ts'
 import type { RouterEvent, RouterSettings } from './router.ts'
 
 export { Config, FREE_MODEL, FREE_ROUTE } from './config.ts'
 export { FreeRouterAdapter } from './router.ts'
 export type { Attempt, RouterDeps, RouterEvent, RouterSettings } from './router.ts'
-export { STATUS_PATH, buildStatus, statusResource } from './status.ts'
+export { RESET_PATH, STATUS_PATH, buildStatus, resetResource, statusResource } from './status.ts'
 export type { ProviderStatus, StatusReport } from './status.ts'
 export { historyFor, wrapReplay } from './history.ts'
 
@@ -70,5 +70,7 @@ export function apply(ctx: Context, config: Config): void {
         : new Response('disabled', { status: 404 }),
     }
     webCtx.effect(() => webCtx.webServer.register(route), 'free-models: status route')
+    const reset = resetResource(known => presets.has(known), r => { tracker.resetRoute(r) })
+    webCtx.effect(() => webCtx.webServer.register({ kind: 'exact' as const, path: RESET_PATH, resource: reset }), 'free-models: reset route')
   })
 }

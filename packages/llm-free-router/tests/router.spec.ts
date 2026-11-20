@@ -293,3 +293,64 @@ describe('status report', () => {
     expect(JSON.stringify(report)).not.toMatch(/sk-|AIza|Bearer/)
   })
 })
+
+describe('same route, different model', () => {
+  it('does not hand one Gemini model another model\'s signature', async () => {
+    const t = await setup(settings({
+      chain: [
+        { route: 'google', model: 'gemini-4-hydrogen', enabled: true },
+        { route: 'google', model: 'gemini-3.8-flash', enabled: true },
+      ],
+    }))
+    t.providers.script('google', ok('first', { sig: 'A' }))
+    const finish = finishOf(await t.run())
+    const replay = finish?.type === 'finish' ? finish.replayState : undefined
+    const assistant = createAssistantMessage({ content: [{ type: 'text', text: 'first' }], source: { provider: 'free-auto', model: 'auto', replayState: replay } })
+    const user = createUserMessage({ content: [{ type: 'text', text: 'again' }], source: { kind: 'user' } } as never)
+    t.providers.script('google', failBefore('QUOTA', 'quota'), ok('second'))
+    await t.run({ messages: [user, assistant, user] })
+    const [toA, toB] = t.providers.callsTo('google').slice(-2)
+    const own = toA?.messages.find(m => m.role === 'assistant')
+    const other = toB?.messages.find(m => m.role === 'assistant')
+    expect(own && 'source' in own && own.source).toMatchObject({ model: 'gemini-4-hydrogen', replayState: { response: { sig: 'A' } } })
+    expect(other && 'source' in other && 'replayState' in other.source).toBe(false)
+  })
+})
+
+describe('re-enabling a disabled route', () => {
+  it('retries an auth-disabled route after the retry window without a restart', async () => {
+    const t = await setup()
+    t.providers.script('google', failBefore('AUTH', 'bad key', { status: 401 }))
+    t.providers.script('openrouter', ok('o'))
+    await t.run()
+    expect(t.tracker.state('google').status).toBe('disabled')
+    t.advance(61 * 60_000)
+    t.providers.script('google', ok('g'))
+    expect(text(await t.run())).toBe('g')
+  })
+
+  it('resetRoute clears a payment-disabled route and its per-model keys', async () => {
+    const t = await setup()
+    t.tracker.recordFailure('google', 'billing', { code: 'HTTP_402' })
+    t.tracker.recordFailure('google/gemini-4-hydrogen', 'quota-daily', { code: 'QUOTA' })
+    t.advance(30 * 86_400_000)
+    expect(t.tracker.state('google').status).toBe('disabled')
+    t.tracker.resetRoute('google')
+    expect(t.tracker.state('google').status).toBe('ok')
+    expect(t.tracker.state('google/gemini-4-hydrogen').status).toBe('ok')
+  })
+
+  it('reset endpoint needs the header, refuses other origins and unknown routes', async () => {
+    const { resetResource } = await import('../src/status.ts')
+    const cleared: string[] = []
+    const serve = resetResource(route => route === 'google', route => { cleared.push(route) })
+    const post = (headers: Record<string, string>, body: unknown) => serve(new Request('http://localhost:3000/free-models/reset', { method: 'POST', headers: { host: 'localhost:3000', ...headers }, body: JSON.stringify(body) }))
+    expect((await post({}, { route: 'google' })).status).toBe(403)
+    expect((await post({ 'x-free-models': '1', origin: 'http://evil.example' }, { route: 'google' })).status).toBe(403)
+    expect((await post({ 'x-free-models': '1' }, { route: 'nope' })).status).toBe(400)
+    expect(cleared).toEqual([])
+    expect((await post({ 'x-free-models': '1', origin: 'http://localhost:3000' }, { route: 'google' })).status).toBe(200)
+    expect(cleared).toEqual(['google'])
+    expect((await serve(new Request('http://localhost:3000/free-models/reset'))).status).toBe(405)
+  })
+})

@@ -20,7 +20,7 @@ const props = (over: Partial<PageProps> = {}): PageProps => ({
   t: key => en[key],
   useConfig: select => select({ status: 'ready', writable: true, value: { chain: [{ route: 'google', model: 'g', enabled: true }, { route: 'openrouter', model: 'x:free', enabled: false }], confirmedNoBilling: { google: true } } }),
   useReport: select => select({ report, failed: false }),
-  write: () => {}, now: () => 0, ...over,
+  write: () => {}, reset: () => {}, now: () => 0, ...over,
 })
 
 describe('FreeModelsPage', () => {
@@ -31,7 +31,7 @@ describe('FreeModelsPage', () => {
     expect(html).toContain('Allowance used')
     expect(html).toContain('50 / 50')
     expect(html).toContain('OPENROUTER_API_KEY')
-    expect(html).toContain('Confirm to enable this provider')
+    expect(html).not.toContain('Confirm to enable this provider') // OpenRouter needs no confirmation
     expect(html).toContain('(unverified)')
   })
   it('shows a hint instead of data when status is unavailable, and disables edits when unwritable', () => {
@@ -41,6 +41,16 @@ describe('FreeModelsPage', () => {
     })} />)
     expect(html).toContain('Usage is not available')
     expect(html).toContain('disabled=""')
+  })
+})
+
+describe('billing confirmation and re-enable', () => {
+  const gem = { ...report.providers[0]!, route: 'google', displayName: 'Google Gemini', overage: 'depends-on-account-billing', status: 'disabled' as const, reason: 'credential missing, invalid or not authorized' }
+  it('asks confirmation only where billing depends on the account, and offers re-enable with the reason', () => {
+    const html = renderToStaticMarkup(<FreeModelsPage {...props({ useReport: select => select({ report: { ...report, providers: [gem] }, failed: false }), useConfig: select => select({ status: 'ready', writable: true, value: { chain: [] } }) })} />)
+    expect(html).toContain('Confirm to enable this provider')
+    expect(html).toContain('Try again')
+    expect(html).toContain('credential missing')
   })
 })
 

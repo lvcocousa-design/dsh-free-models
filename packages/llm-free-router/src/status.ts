@@ -84,3 +84,26 @@ export function statusResource(build: () => StatusReport): (request: Request) =>
     headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
   })
 }
+
+/** Path that re-enables a route the router disabled (bad key, payment request). */
+export const RESET_PATH = '/free-models/reset'
+
+/**
+ * POST { route }. Browsers cannot send the custom header cross-site without a preflight, and a request whose
+ * Origin names another host is refused, so a web page elsewhere cannot trigger it.
+ */
+export function resetResource(known: (route: string) => boolean, reset: (route: string) => void): (request: Request) => Promise<Response> {
+  const json = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } })
+  return async (request) => {
+    if (request.method !== 'POST') return json(405, { error: 'POST only' })
+    if (request.headers.get('x-free-models') !== '1') return json(403, { error: 'missing header' })
+    const origin = request.headers.get('origin')
+    const host = request.headers.get('host')
+    if (origin !== null && host !== null && new URL(origin).host !== host) return json(403, { error: 'cross-origin' })
+    let route: unknown
+    try { route = ((await request.json()) as { route?: unknown }).route } catch { return json(400, { error: 'bad json' }) }
+    if (typeof route !== 'string' || !known(route)) return json(400, { error: 'unknown route' })
+    reset(route)
+    return json(200, { ok: true })
+  }
+}

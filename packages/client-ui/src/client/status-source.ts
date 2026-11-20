@@ -14,6 +14,7 @@ export function createStatusSource(fetchStatus: () => Promise<StatusReport>, int
     try { publish({ report: await fetchStatus(), failed: false }) } catch { publish({ report: snapshot.report, failed: true }) }
   }
   return {
+    refresh: poll,
     getSnapshot: (): StatusSnapshot => snapshot,
     subscribe(listener: () => void): () => void {
       listeners.add(listener)
