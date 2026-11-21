@@ -81,7 +81,7 @@ export class FreeRouterAdapter extends LlmAdapter {
         specific.push({
           provider,
           id: pinnedId(preset.route, model.id),
-          name: `${preset.displayName}: ${model.name} (this model only)`,
+          name: `${preset.route} / ${model.id}`,
           description: `Calls only ${preset.route}/${model.id}. No fallback; the same billing guard applies.`,
         })
       }
