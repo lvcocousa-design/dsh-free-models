@@ -236,9 +236,9 @@ describe('tools and context requirements', () => {
     expect((await t.router.resolveModel('free-auto', 'auto')).context?.contextWindow).toBe(1_000_000)
   })
 
-  it('advertises one virtual model', async () => {
+  it('advertises auto first', async () => {
     const t = await setup()
-    expect((await t.router.listModels('free-auto')).map(model => model.id)).toEqual(['auto'])
+    expect((await t.router.listModels('free-auto')).map(model => model.id)[0]).toBe('auto')
   })
 })
 
@@ -352,5 +352,83 @@ describe('re-enabling a disabled route', () => {
     expect((await post({ 'x-free-models': '1', origin: 'http://localhost:3000' }, { route: 'google' })).status).toBe(200)
     expect(cleared).toEqual(['google'])
     expect((await serve(new Request('http://localhost:3000/free-models/reset'))).status).toBe(405)
+  })
+})
+
+const errorText = (chunks: StreamChunk[]): string => failureOf(chunks)?.message ?? ''
+
+describe('picking one model by name', () => {
+  it('lists auto plus each free preset model, and never a paid one', async () => {
+    const t = await setup()
+    const models = await t.ctx.llm.listModels('free-auto')
+    const ids = models.map(model => model.id)
+    expect(ids[0]).toBe('auto')
+    expect(ids).toContain('zhipu/glm-4.7-flash')
+    expect(ids).toContain('zhipu-intl/glm-4.7-flash')
+    expect(ids).not.toContain('zhipu/glm-5.3-flash')
+    expect(ids).not.toContain('zhipu/glm-4.7-flashx')
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('calls only that model, even when it is off in the chain, and does not fall back', async () => {
+    const t = await setup()
+    t.providers.script('zhipu', ok('from zhipu'))
+    // zhipu is not in the test chain at all, so this also shows `enabled` and the chain are ignored.
+    const chunks = await t.run({ model: 'zhipu/glm-4.7-flash' })
+    expect(text(chunks)).toBe('from zhipu')
+    expect(t.providers.callsTo('zhipu')[0]?.model).toBe('glm-4.7-flash')
+    expect(t.providers.callsTo('google')).toHaveLength(0)
+  })
+
+  it('reports the failure instead of switching when the chosen model is out of quota', async () => {
+    const t = await setup()
+    t.providers.script('google', failBefore('QUOTA', 'quota exhausted'))
+    t.providers.script('openrouter', ok('should not be used'))
+    expect(failureOf(await t.run({ model: 'google/gemini-4-hydrogen' }))?.code).toMatch(/QUOTA|RATE_LIMIT/)
+    expect(t.providers.callsTo('openrouter')).toHaveLength(0)
+  })
+
+  it('refuses a paid model before any request leaves', async () => {
+    const t = await setup()
+    t.providers.script('zhipu', ok('no'))
+    expect(errorText(await t.run({ model: 'zhipu-intl/glm-4.7-flashx' }))).toMatch(/paid model/)
+    expect(errorText(await t.run({ model: 'zhipu/glm-4.7-flashx' }))).toMatch(/not on the free-tier list/)
+    expect(errorText(await t.run({ model: 'zhipu/GLM-5.3-Flash' }))).toMatch(/paid model/)
+    expect(t.providers.callsTo('zhipu')).toHaveLength(0)
+  })
+
+  it('refuses a model that is not on the free list, and an id that is not route/model', async () => {
+    const t = await setup()
+    expect(errorText(await t.run({ model: 'google/some-paid-model' }))).toMatch(/not on the free-tier list/)
+    expect(errorText(await t.run({ model: 'nonsense' }))).toMatch(/no model/)
+    expect(t.providers.calls).toHaveLength(0)
+  })
+
+  it('still needs confirmedNoBilling for routes that depend on account billing', async () => {
+    const t = await setup(settings({ confirm: [] }))
+    t.providers.script('google', ok('no'))
+    expect(errorText(await t.run({ model: 'google/gemini-4-hydrogen' }))).toMatch(/confirm the account has no paid plan/)
+    expect(t.providers.callsTo('google')).toHaveLength(0)
+  })
+
+  it('keeps openrouter ids that contain slashes and only allows :free ones', async () => {
+    const t = await setup()
+    t.providers.script('openrouter', ok('or'))
+    const id = 'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free'
+    expect(text(await t.run({ model: id }))).toBe('or')
+    expect(t.providers.callsTo('openrouter')[0]?.model).toBe('nvidia/nemotron-3-ultra-550b-a55b:free')
+    expect(errorText(await t.run({ model: 'openrouter/some/model' }))).toMatch(/./)
+  })
+
+  it('names the credential when the route has no adapter', async () => {
+    const t = await setup()
+    expect(errorText(await t.run({ model: 'modelscope/Qwen/Qwen3.5-27B' }))).toMatch(/credential/i)
+  })
+
+  it('still honors the sensitive-requests switch for a chosen model', async () => {
+    const t = await setup(settings({ sensitive: true }))
+    t.providers.script('nvidia', ok('no'))
+    expect(errorText(await t.run({ model: 'nvidia/nvidia/nemotron-3-ultra-550b-a55b' }))).toMatch(/improve its products/)
+    expect(t.providers.callsTo('nvidia')).toHaveLength(0)
   })
 })

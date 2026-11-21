@@ -155,6 +155,18 @@ production. Model lists change; ModelScope retires old models. `pnpm check:model
 `MODELSCOPE_ACCESS_TOKEN` / `NVIDIA_API_KEY`; Zhipu and Cloudflare are not checked by the script. Whether the ModelScope and NVIDIA models
 accept tool calls is not stated on the official pages, so they are marked `unverified`.
 
+## Using one specific model
+
+Besides `auto` (the fallback chain), the `free-auto` provider lists every free model from the presets, written as `route/model`, for example `free-auto` / `zhipu/glm-4.7-flash`. Pick one in dsh's model selector and only that model is called:
+
+- No fallback. If it is out of quota or cooling down, the request fails and says why. It never silently moves to another model.
+- The same guard as in the chain runs on every request: the free-model list, `deniedModels`, `confirmedNoBilling`, `forbidBillableCalls`, and the `sensitiveRequests` switch (a model that may train on prompts is refused when it is on).
+- The chain's `enabled` switch and the `minContext` limit do not apply, because you chose the model yourself. The model's own context window is reported to dsh.
+- Paid models are not listed. A paid or unlisted id typed by hand is refused before any request leaves.
+- All models are listed whether or not you have a key. Without the key, the error names the credential to set.
+
+**The guard only covers `free-auto`.** If you pick a route that dsh declares itself (`google`, `zhipu`, `openrouter` and so on) directly in the selector, the request goes to the provider without this plugin and none of these checks run. To keep the billing protection, always choose a model under `free-auto`.
+
 ## How switching works
 
 - The router switches provider only **before the first content chunk**. Once text or tool output has started,
@@ -349,6 +361,18 @@ Cloudflare 官方说明不会用 Workers AI 的内容训练模型，也不保留
 合规提示：**NVIDIA** 仅限试用、不得用于生产，条款允许 NVIDIA 用你的内容改进产品，所以打开 `sensitiveRequests` 时会被跳过。
 **魔搭**仅限非商业使用，不能用于生产。魔搭会下架旧模型，模型清单会变。`pnpm check:models` 在设置了 `MODELSCOPE_ACCESS_TOKEN` / `NVIDIA_API_KEY` 时会检查这两家，
 智谱和 Cloudflare 脚本不检查。魔搭和 NVIDIA 的模型是否支持工具调用，官方页面没写，所以标为“未核实”。
+
+### 单独选用某个模型
+
+除了 `auto`（fallback 链），`free-auto` 还会列出预设里的每个免费模型，格式是 `路由/模型`，例如 `free-auto` / `zhipu/glm-4.7-flash`。在 dsh 的模型选择器里选其中一个，就只调用这一个模型：
+
+- 不做 fallback。额度用完或在冷却中，请求会直接失败并说明原因，不会悄悄换成别的模型。
+- 每次请求都走和链里一样的护栏：免费模型白名单、`deniedModels`、`confirmedNoBilling`、`forbidBillableCalls`，以及 `sensitiveRequests` 开关（开启时会拒绝可能拿提示词训练的模型）。
+- 链里的 `enabled` 开关和 `minContext` 不适用，因为是你自己选的。上报给 dsh 的是该模型自己的上下文窗口。
+- 收费模型不会出现在列表里；手动输入收费或不在名单上的 id，会在请求发出前被拒绝。
+- 不管有没有 Key，所有模型都会列出。没有 Key 时，错误信息会写出要设置哪个凭据名。
+
+**护栏只对 `free-auto` 生效。** 如果在选择器里直接选 dsh 自己声明的路由（`google`、`zhipu`、`openrouter` 等），请求不经过本插件，上面这些检查都不会执行。想保留防计费保护，请始终选 `free-auto` 下的模型。
 
 ### 切换规则
 

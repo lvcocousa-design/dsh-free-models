@@ -74,7 +74,7 @@ export async function setup(initial: RouterSettings = settings(), start = Date.p
   const ctx = new Context()
   await ctx.plugin(LlmRuntime)
   const providers = new FakeProviders()
-  ctx.llm.registerAdapter(['google', 'openrouter', 'mistral', 'groq'], providers)
+  ctx.llm.registerAdapter(['google', 'openrouter', 'mistral', 'groq', 'zhipu', 'zhipu-intl', 'nvidia'], providers)
   let now = start
   const events: RouterEvent[] = []
   const state = { settings: initial }
